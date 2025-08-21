@@ -1,14 +1,15 @@
 import pytest
 import json
 from unittest.mock import Mock, patch
+from decimal import Decimal
 import boto3
-from moto import mock_dynamodb
+from moto import mock_aws
 import api_handler
 
-@mock_dynamodb
+@mock_aws
 class TestAPIHandler:
     
-    def setup_method(self):
+    def setup_method(self, method):
         self.dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
         
         # Create test table
@@ -38,8 +39,8 @@ class TestAPIHandler:
             'teams': [
                 {
                     'name': 'Arsenal',
-                    'forecasted_points': 95.0,
-                    'points_per_game': 2.5,
+                    'forecasted_points': Decimal('95.0'),
+                    'points_per_game': Decimal('2.5'),
                     'forecasted_position': 1
                 }
             ],
@@ -103,7 +104,7 @@ class TestAPIHandler:
     def test_lambda_handler_table_endpoint(self):
         # Insert test data
         test_data = {
-            'teams': [{'name': 'Arsenal', 'forecasted_points': 95.0}],
+            'teams': [{'name': 'Arsenal', 'forecasted_points': Decimal('95.0')}],
             'last_updated': '2024-01-01T00:00:00Z',
             'total_teams': 1
         }

@@ -3,14 +3,13 @@ import json
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime, timezone
 import boto3
-from moto import mock_dynamodb, mock_s3
+from moto import mock_aws
 import data_fetcher
 
-@mock_dynamodb
-@mock_s3
+@mock_aws
 class TestDataFetcher:
     
-    def setup_method(self):
+    def setup_method(self, method):
         self.dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
         self.s3 = boto3.client('s3', region_name='us-east-1')
         
