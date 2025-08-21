@@ -1,0 +1,268 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'EPL Forecast Application Infrastructure'
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, prod]
+    Description: Environment name
+  RapidAPIKey:
+    Type: String
+    NoEcho: true
+    Description: RapidAPI key for football data
+  
+Resources:
+  # DynamoDB table for caching EPL data
+  EPLDataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'epl-data-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  # S3 bucket for ICS feed cache
+  ICSCacheBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'epl-ics-cache-${Environment}-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # IAM role for Lambda functions
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'epl-lambda-role-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: EPLLambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource: !GetAtt EPLDataTable.Arn
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !Sub '${ICSCacheBucket}/*'
+
+  # Data fetcher Lambda function
+  DataFetcherFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'epl-data-fetcher-${Environment}'
+      Runtime: python3.11
+      Handler: data_fetcher.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 300
+      MemorySize: 512
+      Code:
+        ZipFile: |
+          import json
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': json.dumps('Data fetcher placeholder')}
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          DYNAMODB_TABLE: !Ref EPLDataTable
+          S3_BUCKET: !Ref ICSCacheBucket
+          RAPIDAPI_KEY: !Ref RapidAPIKey
+
+  # API handler Lambda function
+  APIHandlerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'epl-api-handler-${Environment}'
+      Runtime: python3.11
+      Handler: api_handler.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        ZipFile: |
+          import json
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': json.dumps('API handler placeholder')}
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          DYNAMODB_TABLE: !Ref EPLDataTable
+
+  # API Gateway
+  EPLRestAPI:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub 'epl-forecast-api-${Environment}'
+      Description: EPL Forecast REST API
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  # API Gateway resource for /table
+  TableResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref EPLRestAPI
+      ParentId: !GetAtt EPLRestAPI.RootResourceId
+      PathPart: table
+
+  # API Gateway method for GET /table
+  TableMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref EPLRestAPI
+      ResourceId: !Ref TableResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${APIHandlerFunction.Arn}/invocations'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseHeaders:
+            Access-Control-Allow-Origin: "'*'"
+
+  # API Gateway resource for /health
+  HealthResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref EPLRestAPI
+      ParentId: !GetAtt EPLRestAPI.RootResourceId
+      PathPart: health
+
+  # API Gateway method for GET /health
+  HealthMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref EPLRestAPI
+      ResourceId: !Ref HealthResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${APIHandlerFunction.Arn}/invocations'
+      MethodResponses:
+        - StatusCode: 200
+
+  # Lambda permissions for API Gateway
+  APIGatewayInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref APIHandlerFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${EPLRestAPI}/*/*'
+
+  # API Gateway deployment
+  APIDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - TableMethod
+      - HealthMethod
+    Properties:
+      RestApiId: !Ref EPLRestAPI
+      StageName: !Ref Environment
+
+  # EventBridge rule for 12am London time (11pm/12am UTC depending on DST)
+  MidnightScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub 'epl-midnight-schedule-${Environment}'
+      Description: Trigger data fetch at midnight London time
+      ScheduleExpression: 'cron(0 23 * * ? *)'  # 11pm UTC (midnight BST)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt DataFetcherFunction.Arn
+          Id: MidnightTarget
+          Input: '{"trigger": "midnight"}'
+
+  # EventBridge rule for 12pm London time (11am/12pm UTC depending on DST)
+  NoonScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub 'epl-noon-schedule-${Environment}'
+      Description: Trigger data fetch at noon London time
+      ScheduleExpression: 'cron(0 11 * * ? *)'  # 11am UTC (noon BST)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt DataFetcherFunction.Arn
+          Id: NoonTarget
+          Input: '{"trigger": "noon"}'
+
+  # Lambda permissions for EventBridge
+  MidnightSchedulePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref DataFetcherFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt MidnightScheduleRule.Arn
+
+  NoonSchedulePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref DataFetcherFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt NoonScheduleRule.Arn
+
+  # CloudWatch Log Groups
+  DataFetcherLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/epl-data-fetcher-${Environment}'
+      RetentionInDays: 14
+
+  APIHandlerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/epl-api-handler-${Environment}'
+      RetentionInDays: 14
+
+Outputs:
+  APIEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub 'https://${EPLRestAPI}.execute-api.${AWS::Region}.amazonaws.com/${Environment}'
+    Export:
+      Name: !Sub '${AWS::StackName}-APIEndpoint'
+  
+  DynamoDBTable:
+    Description: DynamoDB table name
+    Value: !Ref EPLDataTable
+    Export:
+      Name: !Sub '${AWS::StackName}-DynamoDBTable'
+
+  S3Bucket:
+    Description: S3 bucket for ICS cache
+    Value: !Ref ICSCacheBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-S3Bucket'

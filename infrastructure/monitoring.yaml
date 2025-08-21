@@ -1,0 +1,232 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'EPL Forecast Monitoring and Alerting'
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, prod]
+    Description: Environment name
+  AlertEmail:
+    Type: String
+    Description: Email address for alerts
+    Default: "admin@example.com"
+
+Resources:
+  # SNS Topic for alerts
+  AlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub 'epl-forecast-alerts-${Environment}'
+      DisplayName: !Sub 'EPL Forecast Alerts (${Environment})'
+
+  # Email subscription for alerts
+  AlertsEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      TopicArn: !Ref AlertsTopic
+      Endpoint: !Ref AlertEmail
+
+  # CloudWatch Dashboard
+  MonitoringDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub 'EPL-Forecast-${Environment}'
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/Lambda", "Duration", "FunctionName", "epl-data-fetcher-${Environment}" ],
+                  [ ".", "Errors", ".", "." ],
+                  [ ".", "Invocations", ".", "." ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "Data Fetcher Lambda Metrics",
+                "period": 300
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/Lambda", "Duration", "FunctionName", "epl-api-handler-${Environment}" ],
+                  [ ".", "Errors", ".", "." ],
+                  [ ".", "Invocations", ".", "." ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "API Handler Lambda Metrics",
+                "period": 300
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 6,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "Count", "ApiName", "epl-forecast-api-${Environment}" ],
+                  [ ".", "4XXError", ".", "." ],
+                  [ ".", "5XXError", ".", "." ],
+                  [ ".", "Latency", ".", "." ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "API Gateway Metrics",
+                "period": 300
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 6,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "epl-data-${Environment}" ],
+                  [ ".", "ConsumedWriteCapacityUnits", ".", "." ],
+                  [ ".", "UserErrors", ".", "." ],
+                  [ ".", "SystemErrors", ".", "." ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "DynamoDB Metrics",
+                "period": 300
+              }
+            }
+          ]
+        }
+
+  # CloudWatch Alarms
+  DataFetcherErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'EPL-DataFetcher-Errors-${Environment}'
+      AlarmDescription: 'Data fetcher Lambda function errors'
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub 'epl-data-fetcher-${Environment}'
+      AlarmActions:
+        - !Ref AlertsTopic
+
+  DataFetcherDurationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'EPL-DataFetcher-Duration-${Environment}'
+      AlarmDescription: 'Data fetcher Lambda function duration'
+      MetricName: Duration
+      Namespace: AWS/Lambda
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 3
+      Threshold: 240000  # 4 minutes
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub 'epl-data-fetcher-${Environment}'
+      AlarmActions:
+        - !Ref AlertsTopic
+
+  APIHandlerErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'EPL-APIHandler-Errors-${Environment}'
+      AlarmDescription: 'API handler Lambda function errors'
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 5
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub 'epl-api-handler-${Environment}'
+      AlarmActions:
+        - !Ref AlertsTopic
+
+  APIGateway5XXAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'EPL-APIGateway-5XX-${Environment}'
+      AlarmDescription: 'API Gateway 5XX errors'
+      MetricName: 5XXError
+      Namespace: AWS/ApiGateway
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 10
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: ApiName
+          Value: !Sub 'epl-forecast-api-${Environment}'
+      AlarmActions:
+        - !Ref AlertsTopic
+
+  # CloudWatch Log Groups (already defined in main.yaml but adding retention)
+  DataFetcherLogRetention:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/epl-data-fetcher-${Environment}'
+      RetentionInDays: !If [IsProd, 30, 7]
+
+  APIHandlerLogRetention:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/epl-api-handler-${Environment}'
+      RetentionInDays: !If [IsProd, 30, 7]
+
+  # Composite Alarm for overall health
+  SystemHealthAlarm:
+    Type: AWS::CloudWatch::CompositeAlarm
+    Properties:
+      AlarmName: !Sub 'EPL-System-Health-${Environment}'
+      AlarmDescription: 'Overall system health composite alarm'
+      AlarmRule: !Sub |
+        ALARM(${DataFetcherErrorAlarm}) OR 
+        ALARM(${APIHandlerErrorAlarm}) OR 
+        ALARM(${APIGateway5XXAlarm})
+      AlarmActions:
+        - !Ref AlertsTopic
+
+Conditions:
+  IsProd: !Equals [!Ref Environment, prod]
+
+Outputs:
+  DashboardURL:
+    Description: CloudWatch Dashboard URL
+    Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${MonitoringDashboard}'
+    Export:
+      Name: !Sub '${AWS::StackName}-DashboardURL'
+  
+  AlertsTopicArn:
+    Description: SNS Topic ARN for alerts
+    Value: !Ref AlertsTopic
+    Export:
+      Name: !Sub '${AWS::StackName}-AlertsTopicArn'

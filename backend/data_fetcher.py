@@ -1,0 +1,186 @@
+import json
+import os
+import boto3
+import requests
+from datetime import datetime, timezone
+from typing import Dict, List, Any
+import icalendar
+from dateutil import tz
+
+dynamodb = boto3.resource('dynamodb')
+s3 = boto3.client('s3')
+
+def lambda_handler(event, context):
+    """
+    Lambda function to fetch EPL data and calculate forecasts
+    """
+    try:
+        table_name = os.environ['DYNAMODB_TABLE']
+        s3_bucket = os.environ['S3_BUCKET']
+        rapidapi_key = os.environ['RAPIDAPI_KEY']
+        
+        table = dynamodb.Table(table_name)
+        
+        # Check if we should fetch data based on match schedule
+        should_update = check_if_update_needed(s3_bucket)
+        
+        if should_update or event.get('trigger') in ['midnight', 'noon']:
+            # Fetch current EPL table
+            epl_data = fetch_epl_data(rapidapi_key)
+            
+            # Calculate forecasts
+            forecast_data = calculate_forecasts(epl_data)
+            
+            # Store in DynamoDB
+            store_data(table, forecast_data)
+            
+            return {
+                'statusCode': 200,
+                'body': json.dumps({
+                    'message': 'Data updated successfully',
+                    'timestamp': datetime.now(timezone.utc).isoformat()
+                })
+            }
+        else:
+            return {
+                'statusCode': 200,
+                'body': json.dumps({
+                    'message': 'No update needed',
+                    'timestamp': datetime.now(timezone.utc).isoformat()
+                })
+            }
+            
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return {
+            'statusCode': 500,
+            'body': json.dumps({
+                'error': str(e),
+                'timestamp': datetime.now(timezone.utc).isoformat()
+            })
+        }
+
+def fetch_epl_data(rapidapi_key: str) -> Dict[str, Any]:
+    """
+    Fetch current EPL table from RapidAPI
+    """
+    url = "https://football-web-pages1.p.rapidapi.com/league-table.json"
+    querystring = {"comp": "1", "team": "1"}
+    
+    headers = {
+        "X-RapidAPI-Key": rapidapi_key,
+        "X-RapidAPI-Host": "football-web-pages1.p.rapidapi.com"
+    }
+    
+    response = requests.get(url, headers=headers, params=querystring, timeout=30)
+    response.raise_for_status()
+    
+    return response.json()
+
+def calculate_forecasts(epl_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Calculate forecasted final table based on points per game
+    """
+    teams = []
+    
+    # Extract team data from API response
+    table_data = epl_data.get('table', [])
+    
+    for team_data in table_data:
+        played = team_data.get('played', 0)
+        points = team_data.get('points', 0)
+        
+        if played > 0:
+            points_per_game = points / played
+            forecasted_points = points_per_game * 38  # Full season is 38 games
+        else:
+            points_per_game = 0
+            forecasted_points = 0
+        
+        team = {
+            'name': team_data.get('team', ''),
+            'played': played,
+            'won': team_data.get('won', 0),
+            'drawn': team_data.get('drawn', 0),
+            'lost': team_data.get('lost', 0),
+            'for': team_data.get('for', 0),
+            'against': team_data.get('against', 0),
+            'goal_difference': team_data.get('goal_difference', 0),
+            'points': points,
+            'points_per_game': round(points_per_game, 2),
+            'forecasted_points': round(forecasted_points, 1),
+            'current_position': team_data.get('position', 0)
+        }
+        teams.append(team)
+    
+    # Sort by forecasted points (descending), then by goal difference, then by goals for
+    teams.sort(key=lambda x: (-x['forecasted_points'], -x['goal_difference'], -x['for']))
+    
+    # Add forecasted position
+    for i, team in enumerate(teams):
+        team['forecasted_position'] = i + 1
+    
+    return {
+        'teams': teams,
+        'last_updated': datetime.now(timezone.utc).isoformat(),
+        'total_teams': len(teams)
+    }
+
+def check_if_update_needed(s3_bucket: str) -> bool:
+    """
+    Check ICS feed to determine if matches are happening
+    """
+    try:
+        # Fetch ICS feed
+        ics_url = "https://ics.ecal.com/ecal-sub/68a47e3ff49aba000867f867/English%20Premier%20League.ics"
+        response = requests.get(ics_url, timeout=30)
+        response.raise_for_status()
+        
+        # Cache ICS data in S3
+        s3.put_object(
+            Bucket=s3_bucket,
+            Key='epl_fixtures.ics',
+            Body=response.content,
+            ContentType='text/calendar'
+        )
+        
+        # Parse calendar
+        cal = icalendar.Calendar.from_ical(response.content)
+        london_tz = tz.gettz('Europe/London')
+        now = datetime.now(london_tz)
+        
+        # Check for matches in progress (15 min before to 30 min after)
+        for component in cal.walk():
+            if component.name == "VEVENT":
+                start_time = component.get('dtstart').dt
+                if isinstance(start_time, datetime):
+                    start_time = start_time.astimezone(london_tz)
+                    
+                    # Calculate match window (15 min before to 90+30 min after)
+                    match_start = start_time.replace(minute=start_time.minute - 15)
+                    match_end = start_time.replace(hour=start_time.hour + 2, minute=start_time.minute + 30)
+                    
+                    if match_start <= now <= match_end:
+                        return True
+        
+        return False
+        
+    except Exception as e:
+        print(f"Error checking ICS feed: {str(e)}")
+        # If we can't check, assume we should update
+        return True
+
+def store_data(table, data: Dict[str, Any]) -> None:
+    """
+    Store forecast data in DynamoDB
+    """
+    # Store with TTL of 24 hours
+    ttl = int((datetime.now(timezone.utc).timestamp() + 86400))
+    
+    table.put_item(
+        Item={
+            'id': 'current_forecast',
+            'data': data,
+            'ttl': ttl
+        }
+    )
