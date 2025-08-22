@@ -1,0 +1,27 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'EPL Forecast - Minimal Test'
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, prod]
+    Description: Environment name
+  
+Resources:
+  # Just DynamoDB table first
+  EPLDataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'epl-data-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+
+Outputs:
+  DynamoDBTable:
+    Description: DynamoDB table name
+    Value: !Ref EPLDataTable
