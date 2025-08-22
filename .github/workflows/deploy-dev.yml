@@ -70,7 +70,7 @@ jobs:
     - name: Deploy CloudFormation stack
       run: |
         aws cloudformation deploy \
-          --template-file infrastructure/step5.yaml \
+          --template-file infrastructure/complete.yaml \
           --stack-name epl-forecast-${{ env.ENVIRONMENT }} \
           --parameter-overrides \
             Environment=${{ env.ENVIRONMENT }} \
@@ -114,3 +114,13 @@ jobs:
         aws lambda update-function-code \
           --function-name epl-api-handler-${{ env.ENVIRONMENT }} \
           --zip-file fileb://api_handler.zip
+    
+    - name: Get API endpoint
+      run: |
+        API_ENDPOINT=$(aws cloudformation describe-stacks \
+          --stack-name epl-forecast-${{ env.ENVIRONMENT }} \
+          --region ${{ env.AWS_REGION }} \
+          --query 'Stacks[0].Outputs[?OutputKey==`APIEndpoint`].OutputValue' \
+          --output text)
+        echo "API Endpoint: $API_ENDPOINT"
+        echo "API_ENDPOINT=$API_ENDPOINT" >> $GITHUB_ENV
