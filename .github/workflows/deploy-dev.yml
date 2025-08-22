@@ -78,49 +78,39 @@ jobs:
           --capabilities CAPABILITY_NAMED_IAM \
           --region ${{ env.AWS_REGION }}
 
-  # deploy-lambda:
-  #   needs: deploy-infrastructure
-  #   runs-on: ubuntu-latest
-  #   if: github.ref == 'refs/heads/main'
-  #   steps:
-  #   - uses: actions/checkout@v4
-  #   
-  #   - name: Configure AWS credentials
-  #     uses: aws-actions/configure-aws-credentials@v4
-  #     with:
-  #       aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
-  #       aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
-  #       aws-region: ${{ env.AWS_REGION }}
-  #   
-  #   - name: Set up Python
-  #     uses: actions/setup-python@v4
-  #     with:
-  #       python-version: '3.11'
-  #   
-  #   - name: Package Lambda functions
-  #     run: |
-  #       cd backend
-  #       pip install -r requirements.txt -t .
-  #       zip -r data_fetcher.zip data_fetcher.py boto3* requests* icalendar* dateutil* six* urllib3* botocore* jmespath* s3transfer* certifi* charset_normalizer* idna* pytz* recurring_ical_events*
-  #       zip -r api_handler.zip api_handler.py boto3* botocore* jmespath* s3transfer* urllib3* certifi* dateutil* six*
-  #   
-  #   - name: Update Lambda functions
-  #     run: |
-  #       cd backend
-  #       aws lambda update-function-code \
-  #         --function-name epl-data-fetcher-${{ env.ENVIRONMENT }} \
-  #         --zip-file fileb://data_fetcher.zip
-  #       
-  #       aws lambda update-function-code \
-  #         --function-name epl-api-handler-${{ env.ENVIRONMENT }} \
-  #         --zip-file fileb://api_handler.zip
-  #   
-  #   - name: Get API endpoint
-  #     run: |
-  #       API_ENDPOINT=$(aws cloudformation describe-stacks \
-  #         --stack-name epl-forecast-${{ env.ENVIRONMENT }} \
-  #         --region ${{ env.AWS_REGION }} \
-  #         --query 'Stacks[0].Outputs[?OutputKey==`APIEndpoint`].OutputValue' \
-  #         --output text)
-  #       echo "API Endpoint: $API_ENDPOINT"
-  #       echo "API_ENDPOINT=$API_ENDPOINT" >> $GITHUB_ENV
+  deploy-lambda:
+    needs: deploy-infrastructure
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Package Lambda functions
+      run: |
+        cd backend
+        pip install -r requirements.txt -t .
+        zip -r data_fetcher.zip data_fetcher.py boto3* requests* icalendar* dateutil* six* urllib3* botocore* jmespath* s3transfer* certifi* charset_normalizer* idna* pytz* recurring_ical_events*
+        zip -r api_handler.zip api_handler.py boto3* botocore* jmespath* s3transfer* urllib3* certifi* dateutil* six*
+    
+    - name: Update Lambda functions
+      run: |
+        cd backend
+        aws lambda update-function-code \
+          --function-name epl-data-fetcher-${{ env.ENVIRONMENT }} \
+          --zip-file fileb://data_fetcher.zip
+        
+        aws lambda update-function-code \
+          --function-name epl-api-handler-${{ env.ENVIRONMENT }} \
+          --zip-file fileb://api_handler.zip
