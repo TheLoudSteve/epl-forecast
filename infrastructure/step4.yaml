@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'EPL Forecast - Step 4: Core + Simple IAM Role'
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, prod]
+    Description: Environment name
+  
+Resources:
+  # DynamoDB table for caching EPL data
+  EPLDataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'epl-data-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  # S3 bucket for ICS feed cache
+  ICSCacheBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # Simplified IAM role for Lambda functions (managed policies only)
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+
+Outputs:
+  DynamoDBTable:
+    Description: DynamoDB table name
+    Value: !Ref EPLDataTable
+    Export:
+      Name: !Sub '${AWS::StackName}-DynamoDBTable'
+  
+  S3Bucket:
+    Description: S3 bucket for ICS cache
+    Value: !Ref ICSCacheBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-S3Bucket'
+      
+  LambdaRole:
+    Description: Lambda execution role ARN
+    Value: !GetAtt LambdaExecutionRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaRole'
