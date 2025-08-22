@@ -70,10 +70,11 @@ jobs:
     - name: Deploy CloudFormation stack
       run: |
         aws cloudformation deploy \
-          --template-file infrastructure/step4.yaml \
+          --template-file infrastructure/step5.yaml \
           --stack-name epl-forecast-${{ env.ENVIRONMENT }} \
           --parameter-overrides \
             Environment=${{ env.ENVIRONMENT }} \
+            RapidAPIKey=${{ secrets.RAPIDAPI_KEY }} \
           --capabilities CAPABILITY_NAMED_IAM \
           --region ${{ env.AWS_REGION }}
 

@@ -1,0 +1,128 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'EPL Forecast - Step 5: Core + Lambda Functions'
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, prod]
+    Description: Environment name
+  RapidAPIKey:
+    Type: String
+    NoEcho: true
+    Description: RapidAPI key for football data
+  
+Resources:
+  # DynamoDB table for caching EPL data
+  EPLDataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'epl-data-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  # S3 bucket for ICS feed cache
+  ICSCacheBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # IAM role for Lambda functions
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+
+  # Data fetcher Lambda function
+  DataFetcherFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'epl-data-fetcher-${Environment}'
+      Runtime: python3.11
+      Handler: data_fetcher.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 300
+      MemorySize: 512
+      Code:
+        ZipFile: |
+          import json
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': json.dumps('Data fetcher placeholder')}
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          DYNAMODB_TABLE: !Ref EPLDataTable
+          S3_BUCKET: !Ref ICSCacheBucket
+          RAPIDAPI_KEY: !Ref RapidAPIKey
+
+  # API handler Lambda function
+  APIHandlerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'epl-api-handler-${Environment}'
+      Runtime: python3.11
+      Handler: api_handler.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        ZipFile: |
+          import json
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': json.dumps('API handler placeholder')}
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          DYNAMODB_TABLE: !Ref EPLDataTable
+
+Outputs:
+  DynamoDBTable:
+    Description: DynamoDB table name
+    Value: !Ref EPLDataTable
+    Export:
+      Name: !Sub '${AWS::StackName}-DynamoDBTable'
+  
+  S3Bucket:
+    Description: S3 bucket for ICS cache
+    Value: !Ref ICSCacheBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-S3Bucket'
+      
+  LambdaRole:
+    Description: Lambda execution role ARN
+    Value: !GetAtt LambdaExecutionRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaRole'
+
+  DataFetcherFunction:
+    Description: Data fetcher Lambda function name
+    Value: !Ref DataFetcherFunction
+    Export:
+      Name: !Sub '${AWS::StackName}-DataFetcherFunction'
+
+  APIHandlerFunction:
+    Description: API handler Lambda function name
+    Value: !Ref APIHandlerFunction
+    Export:
+      Name: !Sub '${AWS::StackName}-APIHandlerFunction'
