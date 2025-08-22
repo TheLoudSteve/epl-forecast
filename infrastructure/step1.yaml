@@ -32,7 +32,6 @@ Resources:
   ICSCacheBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'epl-ics-cache-${Environment}-${AWS::AccountId}'
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -43,7 +42,6 @@ Resources:
   LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub 'epl-lambda-role-${Environment}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
