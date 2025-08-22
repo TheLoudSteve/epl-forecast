@@ -124,3 +124,13 @@ jobs:
           --output text)
         echo "API Endpoint: $API_ENDPOINT"
         echo "API_ENDPOINT=$API_ENDPOINT" >> $GITHUB_ENV
+    
+    - name: Trigger initial data fetch
+      run: |
+        aws lambda invoke \
+          --function-name epl-data-fetcher-${{ env.ENVIRONMENT }} \
+          --region ${{ env.AWS_REGION }} \
+          --payload '{}' \
+          response.json
+        echo "Data fetcher response:"
+        cat response.json

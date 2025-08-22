@@ -6,7 +6,7 @@ class EPLService: ObservableObject {
     @Published var errorMessage: String?
     @Published var lastUpdated: String?
     
-    private let baseURL = "https://your-api-gateway-url.execute-api.us-east-1.amazonaws.com/dev"
+    private let baseURL = "https://1e4u1ghr3i.execute-api.us-east-1.amazonaws.com/dev"
     
     init() {
         fetchTeams()
