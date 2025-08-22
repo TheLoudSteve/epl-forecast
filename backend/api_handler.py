@@ -4,7 +4,7 @@ import boto3
 from datetime import datetime, timezone
 from typing import Dict, Any
 
-dynamodb = boto3.resource('dynamodb')
+dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
 
 def lambda_handler(event, context):
     """

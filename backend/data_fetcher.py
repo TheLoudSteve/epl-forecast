@@ -7,8 +7,8 @@ from typing import Dict, List, Any
 import icalendar
 from dateutil import tz
 
-dynamodb = boto3.resource('dynamodb')
-s3 = boto3.client('s3')
+dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
+s3 = boto3.client('s3', region_name='us-east-1')
 
 def lambda_handler(event, context):
     """
