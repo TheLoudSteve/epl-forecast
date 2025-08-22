@@ -70,7 +70,7 @@ jobs:
     - name: Deploy CloudFormation stack
       run: |
         aws cloudformation deploy \
-          --template-file infrastructure/complete.yaml \
+          --template-file infrastructure/step6.yaml \
           --stack-name epl-forecast-${{ env.ENVIRONMENT }} \
           --parameter-overrides \
             Environment=${{ env.ENVIRONMENT }} \

@@ -1,0 +1,205 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'EPL Forecast - Step 6: Lambda Functions + API Gateway'
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, prod]
+    Description: Environment name
+  RapidAPIKey:
+    Type: String
+    NoEcho: true
+    Description: RapidAPI key for football data
+  
+Resources:
+  # DynamoDB table for caching EPL data
+  EPLDataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'epl-data-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  # S3 bucket for ICS feed cache
+  ICSCacheBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # IAM role for Lambda functions
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+
+  # Data fetcher Lambda function
+  DataFetcherFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'epl-data-fetcher-${Environment}'
+      Runtime: python3.11
+      Handler: data_fetcher.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 300
+      MemorySize: 512
+      Code:
+        ZipFile: |
+          import json
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': json.dumps('Data fetcher placeholder')}
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          DYNAMODB_TABLE: !Ref EPLDataTable
+          S3_BUCKET: !Ref ICSCacheBucket
+          RAPIDAPI_KEY: !Ref RapidAPIKey
+
+  # API handler Lambda function
+  APIHandlerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'epl-api-handler-${Environment}'
+      Runtime: python3.11
+      Handler: api_handler.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        ZipFile: |
+          import json
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': json.dumps('API handler placeholder')}
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          DYNAMODB_TABLE: !Ref EPLDataTable
+
+  # API Gateway
+  EPLForecastAPI:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub 'epl-forecast-api-${Environment}'
+      Description: EPL Forecast API
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  # Health endpoint resource
+  HealthResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref EPLForecastAPI
+      ParentId: !GetAtt EPLForecastAPI.RootResourceId
+      PathPart: health
+
+  # Health endpoint method
+  HealthMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref EPLForecastAPI
+      ResourceId: !Ref HealthResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${APIHandlerFunction.Arn}/invocations'
+
+  # Table endpoint resource
+  TableResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref EPLForecastAPI
+      ParentId: !GetAtt EPLForecastAPI.RootResourceId
+      PathPart: table
+
+  # Table endpoint method
+  TableMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref EPLForecastAPI
+      ResourceId: !Ref TableResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${APIHandlerFunction.Arn}/invocations'
+
+  # Lambda permissions for API Gateway
+  APIHandlerInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref APIHandlerFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${EPLForecastAPI}/*/*/*'
+
+  # API Gateway deployment
+  APIDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: 
+      - HealthMethod
+      - TableMethod
+    Properties:
+      RestApiId: !Ref EPLForecastAPI
+      StageName: !Ref Environment
+
+Outputs:
+  DynamoDBTable:
+    Description: DynamoDB table name
+    Value: !Ref EPLDataTable
+    Export:
+      Name: !Sub '${AWS::StackName}-DynamoDBTable'
+  
+  S3Bucket:
+    Description: S3 bucket for ICS cache
+    Value: !Ref ICSCacheBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-S3Bucket'
+      
+  LambdaRole:
+    Description: Lambda execution role ARN
+    Value: !GetAtt LambdaExecutionRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaRole'
+
+  DataFetcherFunction:
+    Description: Data fetcher Lambda function name
+    Value: !Ref DataFetcherFunction
+    Export:
+      Name: !Sub '${AWS::StackName}-DataFetcherFunction'
+
+  APIHandlerFunction:
+    Description: API handler Lambda function name
+    Value: !Ref APIHandlerFunction
+    Export:
+      Name: !Sub '${AWS::StackName}-APIHandlerFunction'
+
+  APIEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub 'https://${EPLForecastAPI}.execute-api.${AWS::Region}.amazonaws.com/${Environment}'
+    Export:
+      Name: !Sub '${AWS::StackName}-APIEndpoint'
