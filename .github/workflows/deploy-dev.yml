@@ -51,6 +51,22 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
         aws-region: ${{ env.AWS_REGION }}
     
+    - name: Check and clean up failed stack
+      run: |
+        STACK_STATUS=$(aws cloudformation describe-stacks \
+          --stack-name epl-forecast-${{ env.ENVIRONMENT }} \
+          --query 'Stacks[0].StackStatus' \
+          --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+        
+        if [ "$STACK_STATUS" = "ROLLBACK_COMPLETE" ] || [ "$STACK_STATUS" = "CREATE_FAILED" ]; then
+          echo "Stack is in failed state ($STACK_STATUS), deleting it..."
+          aws cloudformation delete-stack --stack-name epl-forecast-${{ env.ENVIRONMENT }}
+          aws cloudformation wait stack-delete-complete --stack-name epl-forecast-${{ env.ENVIRONMENT }}
+          echo "Stack deleted successfully"
+        else
+          echo "Stack status: $STACK_STATUS"
+        fi
+
     - name: Deploy CloudFormation stack
       run: |
         aws cloudformation deploy \
