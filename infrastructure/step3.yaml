@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'EPL Forecast - Step 3: DynamoDB + S3'
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, prod]
+    Description: Environment name
+  
+Resources:
+  # DynamoDB table for caching EPL data
+  EPLDataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'epl-data-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  # S3 bucket for ICS feed cache
+  ICSCacheBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+Outputs:
+  DynamoDBTable:
+    Description: DynamoDB table name
+    Value: !Ref EPLDataTable
+    Export:
+      Name: !Sub '${AWS::StackName}-DynamoDBTable'
+  
+  S3Bucket:
+    Description: S3 bucket for ICS cache
+    Value: !Ref ICSCacheBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-S3Bucket'
