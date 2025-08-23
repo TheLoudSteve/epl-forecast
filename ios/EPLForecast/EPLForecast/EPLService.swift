@@ -37,22 +37,33 @@ class EPLService: ObservableObject {
                 self?.isLoading = false
                 
                 if let error = error {
-                    self?.errorMessage = "Network error: \(error.localizedDescription)"
+                    if error.localizedDescription.contains("offline") || error.localizedDescription.contains("network") {
+                        self?.errorMessage = "No internet connection. Please check your network and try again."
+                    } else {
+                        self?.errorMessage = "Connection failed. Please try again later."
+                    }
                     return
                 }
                 
                 guard let httpResponse = response as? HTTPURLResponse else {
-                    self?.errorMessage = "Invalid response"
+                    self?.errorMessage = "Unable to connect to server. Please try again."
                     return
                 }
                 
                 guard 200...299 ~= httpResponse.statusCode else {
-                    self?.errorMessage = "Server error: \(httpResponse.statusCode)"
+                    switch httpResponse.statusCode {
+                    case 500...599:
+                        self?.errorMessage = "Server is temporarily unavailable. Please try again in a few minutes."
+                    case 400...499:
+                        self?.errorMessage = "Unable to load data. Please try again."
+                    default:
+                        self?.errorMessage = "Something went wrong. Please try again later."
+                    }
                     return
                 }
                 
                 guard let data = data else {
-                    self?.errorMessage = "No data received"
+                    self?.errorMessage = "No data available. Please try again."
                     return
                 }
                 
@@ -61,7 +72,8 @@ class EPLService: ObservableObject {
                     self?.teams = apiResponse.forecastTable
                     self?.lastUpdated = self?.formatDate(apiResponse.metadata.lastUpdated)
                 } catch {
-                    self?.errorMessage = "Failed to decode data: \(error.localizedDescription)"
+                    print("JSON decode error: \(error)")
+                    self?.errorMessage = "Unable to process data. The server may be updating. Please try again in a moment."
                 }
             }
         }.resume()

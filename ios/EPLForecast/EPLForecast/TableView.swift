@@ -6,8 +6,21 @@ struct TableView: View {
     var body: some View {
         VStack {
             if eplService.isLoading {
-                ProgressView("Loading forecast...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                VStack(spacing: 20) {
+                    ProgressView()
+                        .scaleEffect(1.2)
+                        .tint(.blue)
+                    
+                    VStack(spacing: 8) {
+                        Text("Loading EPL Forecast")
+                            .font(.headline)
+                        
+                        Text("Getting latest Premier League data...")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let errorMessage = eplService.errorMessage {
                 VStack(spacing: 20) {
                     Image(systemName: "exclamationmark.triangle")
@@ -52,6 +65,7 @@ struct TeamRowView: View {
                 .fontWeight(.bold)
                 .foregroundColor(.primary)
                 .frame(width: 30, alignment: .leading)
+                .accessibilityLabel("Position \(team.forecastedPosition)")
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(team.name)
@@ -89,6 +103,8 @@ struct TeamRowView: View {
             }
         }
         .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(team.name), position \(team.forecastedPosition), forecasted \(String(format: "%.0f", team.forecastedPoints)) points, played \(team.played) games, \(String(format: "%.1f", team.pointsPerGame)) points per game")
     }
 }
 
