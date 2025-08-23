@@ -4,6 +4,7 @@ import boto3
 import requests
 from datetime import datetime, timezone
 from typing import Dict, List, Any
+from decimal import Decimal
 import icalendar
 from dateutil import tz
 
@@ -131,8 +132,8 @@ def calculate_forecasts(epl_data: Dict[str, Any]) -> Dict[str, Any]:
             'against': all_matches.get('against', 0),
             'goal_difference': all_matches.get('goal-difference', 0),
             'points': points,
-            'points_per_game': round(points_per_game, 2),
-            'forecasted_points': round(forecasted_points, 1),
+            'points_per_game': Decimal(str(round(points_per_game, 2))),
+            'forecasted_points': Decimal(str(round(forecasted_points, 1))),
             'current_position': team_data.get('position', 0)
         }
         teams.append(team)
