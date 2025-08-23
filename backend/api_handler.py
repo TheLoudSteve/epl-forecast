@@ -58,10 +58,13 @@ def handle_table_request():
     table = dynamodb.Table(table_name)
     
     try:
+        print(f"Querying DynamoDB table: {table_name}")
         # Get current forecast data
         response = table.get_item(Key={'id': 'current_forecast'})
+        print(f"DynamoDB response: {response}")
         
         if 'Item' not in response:
+            print("No item found in DynamoDB with key 'current_forecast'")
             return {
                 'statusCode': 404,
                 'headers': get_cors_headers(),

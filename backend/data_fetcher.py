@@ -15,40 +15,39 @@ def lambda_handler(event, context):
     Lambda function to fetch EPL data and calculate forecasts
     """
     try:
+        print(f"Lambda triggered with event: {event}")
+        
         table_name = os.environ['DYNAMODB_TABLE']
         s3_bucket = os.environ['S3_BUCKET']
         rapidapi_key = os.environ['RAPIDAPI_KEY']
         
+        print(f"Environment variables - Table: {table_name}, Bucket: {s3_bucket}")
+        
         table = dynamodb.Table(table_name)
         
-        # Check if we should fetch data based on match schedule
-        should_update = check_if_update_needed(s3_bucket)
+        # For now, always update (bypass schedule check for testing)
+        print("Starting data fetch...")
         
-        if should_update or event.get('trigger') in ['midnight', 'noon']:
-            # Fetch current EPL table
-            epl_data = fetch_epl_data(rapidapi_key)
-            
-            # Calculate forecasts
-            forecast_data = calculate_forecasts(epl_data)
-            
-            # Store in DynamoDB
-            store_data(table, forecast_data)
-            
-            return {
-                'statusCode': 200,
-                'body': json.dumps({
-                    'message': 'Data updated successfully',
-                    'timestamp': datetime.now(timezone.utc).isoformat()
-                })
-            }
-        else:
-            return {
-                'statusCode': 200,
-                'body': json.dumps({
-                    'message': 'No update needed',
-                    'timestamp': datetime.now(timezone.utc).isoformat()
-                })
-            }
+        # Fetch current EPL table
+        epl_data = fetch_epl_data(rapidapi_key)
+        print(f"Fetched EPL data with {len(epl_data.get('table', []))} teams")
+        
+        # Calculate forecasts
+        forecast_data = calculate_forecasts(epl_data)
+        print(f"Calculated forecast data for {len(forecast_data.get('teams', []))} teams")
+        
+        # Store in DynamoDB
+        store_data(table, forecast_data)
+        print("Successfully stored data in DynamoDB")
+        
+        return {
+            'statusCode': 200,
+            'body': json.dumps({
+                'message': 'Data updated successfully',
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'teams_processed': len(forecast_data.get('teams', []))
+            })
+        }
             
     except Exception as e:
         print(f"Error: {str(e)}")
