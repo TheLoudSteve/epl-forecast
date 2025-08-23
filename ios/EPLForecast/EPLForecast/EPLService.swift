@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 class EPLService: ObservableObject {
     @Published var teams: [Team] = []
@@ -6,10 +7,19 @@ class EPLService: ObservableObject {
     @Published var errorMessage: String?
     @Published var lastUpdated: String?
     
-    private let baseURL = "https://1e4u1ghr3i.execute-api.us-east-1.amazonaws.com/dev"
+    private let baseURL = "https://aiighxj72l.execute-api.us-west-2.amazonaws.com/prod"
+    private var refreshTimer: Timer?
+    private var isAppActive = true
     
     init() {
         fetchTeams()
+        setupNotificationObservers()
+        startPeriodicRefresh()
+    }
+    
+    deinit {
+        refreshTimer?.invalidate()
+        NotificationCenter.default.removeObserver(self)
     }
     
     func fetchTeams() {
@@ -59,6 +69,49 @@ class EPLService: ObservableObject {
     
     func refreshData() {
         fetchTeams()
+    }
+    
+    // MARK: - App Lifecycle and Periodic Refresh
+    
+    private func setupNotificationObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appDidBecomeActive),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appWillResignActive),
+            name: UIApplication.willResignActiveNotification,
+            object: nil
+        )
+    }
+    
+    @objc private func appDidBecomeActive() {
+        isAppActive = true
+        fetchTeams() // Refresh when app becomes active
+        startPeriodicRefresh() // Resume 60-second timer
+    }
+    
+    @objc private func appWillResignActive() {
+        isAppActive = false
+        stopPeriodicRefresh() // Pause timer when app goes to background
+    }
+    
+    private func startPeriodicRefresh() {
+        stopPeriodicRefresh() // Clear any existing timer
+        
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
+            guard let self = self, self.isAppActive else { return }
+            self.fetchTeams()
+        }
+    }
+    
+    private func stopPeriodicRefresh() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
     }
     
     private func formatDate(_ isoString: String) -> String {
