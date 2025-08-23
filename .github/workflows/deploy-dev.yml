@@ -75,7 +75,7 @@ jobs:
           --parameter-overrides \
             Environment=${{ env.ENVIRONMENT }} \
             RapidAPIKey=${{ secrets.RAPIDAPI_KEY }} \
-          --capabilities CAPABILITY_NAMED_IAM \
+          --capabilities CAPABILITY_IAM \
           --region ${{ env.AWS_REGION }}
 
   deploy-lambda:

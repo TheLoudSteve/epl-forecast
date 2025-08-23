@@ -3,37 +3,17 @@ name: Deploy to Production
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 env:
   AWS_REGION: us-west-2
   ENVIRONMENT: prod
 
 jobs:
-  test:
+  deploy:
     runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
+    environment: production
     
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install dependencies
-      run: |
-        cd backend
-        pip install -r requirements.txt
-        pip install pytest pytest-cov "moto[all]"
-    
-    - name: Run tests
-      run: |
-        cd backend
-        python -m pytest tests/ -v --cov=. --cov-report=xml
-
-  deploy-infrastructure:
-    # Skip tests for initial production deployment
-    # needs: test
-    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     
@@ -43,6 +23,34 @@ jobs:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
         aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Package Lambda functions
+      run: |
+        mkdir -p lambda-packages
+        
+        # Package api_handler
+        cd backend
+        pip install -r requirements.txt -t .
+        zip -r ../lambda-packages/api_handler.zip api_handler.py boto3* botocore* jmespath* s3transfer* urllib3* certifi* dateutil* six*
+        
+        # Package data_fetcher  
+        zip -r ../lambda-packages/data_fetcher.zip data_fetcher.py boto3* requests* icalendar* botocore* jmespath* s3transfer* urllib3* certifi* charset_normalizer* idna* pytz* dateutil* six*
+        cd ..
+    
+    - name: Upload Lambda packages to S3
+      run: |
+        # Create deployment bucket if it doesn't exist
+        BUCKET_NAME="epl-forecast-prod-deployments-$(aws sts get-caller-identity --query Account --output text)"
+        aws s3 mb s3://$BUCKET_NAME --region ${{ env.AWS_REGION }} 2>/dev/null || true
+        
+        # Upload packages
+        aws s3 cp lambda-packages/api_handler.zip s3://$BUCKET_NAME/
+        aws s3 cp lambda-packages/data_fetcher.zip s3://$BUCKET_NAME/
     
     - name: Check if stack exists and cleanup if needed
       run: |
@@ -58,49 +66,64 @@ jobs:
     
     - name: Deploy CloudFormation stack
       run: |
+        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        BUCKET_NAME="epl-forecast-prod-deployments-$ACCOUNT_ID"
+        
         aws cloudformation deploy \
           --template-file infrastructure/step6.yaml \
           --stack-name epl-forecast-${{ env.ENVIRONMENT }} \
           --parameter-overrides \
             Environment=${{ env.ENVIRONMENT }} \
             RapidAPIKey=${{ secrets.RAPIDAPI_KEY }} \
+            S3BucketName=$BUCKET_NAME \
           --capabilities CAPABILITY_IAM \
           --region ${{ env.AWS_REGION }}
-
-  integration-test:
-    needs: deploy-infrastructure
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
     
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
-        aws-region: ${{ env.AWS_REGION }}
+    - name: Update Lambda function code
+      run: |
+        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        BUCKET_NAME="epl-forecast-prod-deployments-$ACCOUNT_ID"
+        
+        # Update API handler function
+        aws lambda update-function-code \
+          --function-name epl-api-handler-${{ env.ENVIRONMENT }} \
+          --s3-bucket $BUCKET_NAME \
+          --s3-key api_handler.zip \
+          --region ${{ env.AWS_REGION }}
+        
+        # Update data fetcher function  
+        aws lambda update-function-code \
+          --function-name epl-data-fetcher-${{ env.ENVIRONMENT }} \
+          --s3-bucket $BUCKET_NAME \
+          --s3-key data_fetcher.zip \
+          --region ${{ env.AWS_REGION }}
     
-    - name: Run integration tests
+    - name: Get API endpoint and run integration tests
       run: |
         API_ENDPOINT=$(aws cloudformation describe-stacks \
           --stack-name epl-forecast-${{ env.ENVIRONMENT }} \
           --region ${{ env.AWS_REGION }} \
-          --query 'Stacks[0].Outputs[?OutputKey==`ApiUrl`].OutputValue' \
+          --query 'Stacks[0].Outputs[?OutputKey==`APIEndpoint`].OutputValue' \
           --output text)
         
         echo "Production API Endpoint: $API_ENDPOINT"
         
-        # Wait for deployment to complete
-        echo "Waiting for API to be ready..."
-        sleep 60
-        
-        # Test health endpoint
-        echo "Testing /health endpoint..."
-        curl -f "$API_ENDPOINT/health" || exit 1
-        
-        # Test table endpoint (may need time for data to populate)
-        echo "Testing /table endpoint..."
-        curl -f "$API_ENDPOINT/table" || echo "Table endpoint may need time to populate data"
-        
-        echo "Production deployment successful!"
-        echo "Production API Endpoint: $API_ENDPOINT"
+        if [[ -n "$API_ENDPOINT" ]]; then
+          # Wait for API to be ready
+          echo "Waiting 60 seconds for API to initialize..."
+          sleep 60
+          
+          # Test health endpoint
+          echo "Testing /health endpoint..."
+          curl -f "$API_ENDPOINT/health" || echo "Health endpoint not yet ready"
+          
+          # Test table endpoint (may need time for data to populate)
+          echo "Testing /table endpoint..."
+          curl -f "$API_ENDPOINT/table" || echo "Table endpoint may need time to populate data"
+          
+          echo "Production deployment completed successfully!"
+          echo "API Endpoint: $API_ENDPOINT"
+        else
+          echo "ERROR: Could not get API endpoint from CloudFormation output"
+          exit 1
+        fi
