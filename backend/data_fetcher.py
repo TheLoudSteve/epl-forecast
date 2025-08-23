@@ -71,10 +71,21 @@ def fetch_epl_data(rapidapi_key: str) -> Dict[str, Any]:
         "X-RapidAPI-Host": "football-web-pages1.p.rapidapi.com"
     }
     
+    print(f"Calling RapidAPI: {url}")
+    print(f"Headers: X-RapidAPI-Host: {headers['X-RapidAPI-Host']}")
+    print(f"Params: {querystring}")
+    
     response = requests.get(url, headers=headers, params=querystring, timeout=30)
+    print(f"API Response Status: {response.status_code}")
+    print(f"API Response Headers: {dict(response.headers)}")
+    
     response.raise_for_status()
     
-    return response.json()
+    data = response.json()
+    print(f"API Response Data keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
+    print(f"API Response sample: {str(data)[:500]}...")
+    
+    return data
 
 def calculate_forecasts(epl_data: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -82,12 +93,26 @@ def calculate_forecasts(epl_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     teams = []
     
-    # Extract team data from API response
-    table_data = epl_data.get('table', [])
+    # Extract team data from API response - correct structure is league-table.teams
+    table_data = epl_data.get('league-table', {}).get('teams', [])
+    print(f"Table data found: {len(table_data)} teams")
+    
+    if not table_data:
+        print("WARNING: No table data found in API response!")
+        print(f"Available keys in epl_data: {list(epl_data.keys())}")
+        # Try alternative key structures
+        if 'table' in epl_data:
+            table_data = epl_data.get('table', [])
+            print(f"Found table data instead: {len(table_data)} teams")
+        elif 'standings' in epl_data:
+            table_data = epl_data.get('standings', [])
+            print(f"Found standings data instead: {len(table_data)} teams")
     
     for team_data in table_data:
-        played = team_data.get('played', 0)
-        points = team_data.get('points', 0)
+        # Extract data from the correct API structure
+        all_matches = team_data.get('all-matches', {})
+        played = all_matches.get('played', 0)
+        points = team_data.get('total-points', 0)
         
         if played > 0:
             points_per_game = points / played
@@ -97,14 +122,14 @@ def calculate_forecasts(epl_data: Dict[str, Any]) -> Dict[str, Any]:
             forecasted_points = 0
         
         team = {
-            'name': team_data.get('team', ''),
+            'name': team_data.get('name', ''),
             'played': played,
-            'won': team_data.get('won', 0),
-            'drawn': team_data.get('drawn', 0),
-            'lost': team_data.get('lost', 0),
-            'for': team_data.get('for', 0),
-            'against': team_data.get('against', 0),
-            'goal_difference': team_data.get('goal_difference', 0),
+            'won': all_matches.get('won', 0),
+            'drawn': all_matches.get('drawn', 0),
+            'lost': all_matches.get('lost', 0),
+            'for': all_matches.get('for', 0),
+            'against': all_matches.get('against', 0),
+            'goal_difference': all_matches.get('goal-difference', 0),
             'points': points,
             'points_per_game': round(points_per_game, 2),
             'forecasted_points': round(forecasted_points, 1),
