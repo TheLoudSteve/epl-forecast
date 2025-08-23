@@ -3,8 +3,15 @@ import os
 import boto3
 from datetime import datetime, timezone
 from typing import Dict, Any
+from decimal import Decimal
 
 dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
+
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return float(obj)
+        return super(DecimalEncoder, self).default(obj)
 
 def lambda_handler(event, context):
     """
@@ -24,7 +31,7 @@ def lambda_handler(event, context):
             return {
                 'statusCode': 404,
                 'headers': get_cors_headers(),
-                'body': json.dumps({'error': 'Not found'})
+                'body': json.dumps({'error': 'Not found'}, cls=DecimalEncoder)
             }
             
     except Exception as e:
@@ -35,7 +42,7 @@ def lambda_handler(event, context):
             'body': json.dumps({
                 'error': 'Internal server error',
                 'timestamp': datetime.now(timezone.utc).isoformat()
-            })
+            }, cls=DecimalEncoder)
         }
 
 def handle_health_check():
@@ -49,7 +56,7 @@ def handle_health_check():
             'status': 'healthy',
             'timestamp': datetime.now(timezone.utc).isoformat(),
             'service': 'epl-forecast-api'
-        })
+        }, cls=DecimalEncoder)
     }
 
 def handle_table_request():
@@ -73,27 +80,16 @@ def handle_table_request():
                 'body': json.dumps({
                     'error': 'No forecast data available',
                     'message': 'Data may still be loading. Please try again in a few minutes.'
-                })
+                }, cls=DecimalEncoder)
             }
         
         forecast_data = response['Item']['data']
         print(f"Forecast data keys: {list(forecast_data.keys())}")
         print(f"Number of teams in forecast: {len(forecast_data.get('teams', []))}")
         
-        # Convert Decimal values to float for JSON serialization
-        teams_data = []
-        for team in forecast_data.get('teams', []):
-            team_copy = team.copy()
-            # Convert Decimal to float for JSON serialization
-            if 'points_per_game' in team_copy:
-                team_copy['points_per_game'] = float(team_copy['points_per_game'])
-            if 'forecasted_points' in team_copy:
-                team_copy['forecasted_points'] = float(team_copy['forecasted_points'])
-            teams_data.append(team_copy)
-        
-        # Add API metadata
+        # Add API metadata (DecimalEncoder will handle Decimal conversion automatically)
         api_response = {
-            'forecast_table': teams_data,
+            'forecast_table': forecast_data.get('teams', []),
             'metadata': {
                 'last_updated': forecast_data['last_updated'],
                 'total_teams': forecast_data['total_teams'],
@@ -105,7 +101,7 @@ def handle_table_request():
         return {
             'statusCode': 200,
             'headers': get_cors_headers(),
-            'body': json.dumps(api_response)
+            'body': json.dumps(api_response, cls=DecimalEncoder)
         }
         
     except Exception as e:
@@ -116,7 +112,7 @@ def handle_table_request():
             'body': json.dumps({
                 'error': 'Failed to retrieve data',
                 'timestamp': datetime.now(timezone.utc).isoformat()
-            })
+            }, cls=DecimalEncoder)
         }
 
 def handle_debug_request():
@@ -147,7 +143,7 @@ def handle_debug_request():
         return {
             'statusCode': 200,
             'headers': get_cors_headers(),
-            'body': json.dumps(debug_info, indent=2)
+            'body': json.dumps(debug_info, indent=2, cls=DecimalEncoder)
         }
         
     except Exception as e:
@@ -157,7 +153,7 @@ def handle_debug_request():
             'body': json.dumps({
                 'error': f'Debug error: {str(e)}',
                 'table_name': table_name
-            })
+            }, cls=DecimalEncoder)
         }
 
 def get_cors_headers():
