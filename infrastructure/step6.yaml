@@ -157,12 +157,34 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${EPLForecastAPI}/*/*/*'
 
+  # Debug endpoint resource
+  DebugResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref EPLForecastAPI
+      ParentId: !GetAtt EPLForecastAPI.RootResourceId
+      PathPart: debug
+
+  # Debug endpoint method
+  DebugMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref EPLForecastAPI
+      ResourceId: !Ref DebugResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${APIHandlerFunction.Arn}/invocations'
+
   # API Gateway deployment
   APIDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn: 
       - HealthMethod
       - TableMethod
+      - DebugMethod
     Properties:
       RestApiId: !Ref EPLForecastAPI
       StageName: !Ref Environment
