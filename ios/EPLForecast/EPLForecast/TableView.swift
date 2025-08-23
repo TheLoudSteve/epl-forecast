@@ -30,26 +30,8 @@ struct TableView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
-                    if let lastUpdated = eplService.lastUpdated {
-                        Section {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Last Updated")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Text(lastUpdated)
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-                    
-                    Section {
-                        ForEach(eplService.teams) { team in
-                            TeamRowView(team: team)
-                        }
-                    } header: {
-                        Text("Forecasted Final Table (38 Games)")
-                            .font(.headline)
+                    ForEach(eplService.teams) { team in
+                        TeamRowView(team: team)
                     }
                 }
                 .refreshable {
@@ -76,12 +58,18 @@ struct TeamRowView: View {
                     .font(.body)
                     .fontWeight(.medium)
                 
-                HStack(spacing: 12) {
-                    Label("\(team.played)", systemImage: "gamecontroller.fill")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                HStack(spacing: 8) {
+                    AsyncImage(url: URL(string: teamLogoURL(for: team.name))) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                    } placeholder: {
+                        Image(systemName: teamIcon(for: team.name))
+                            .foregroundColor(teamColor(for: team.name))
+                    }
+                    .frame(width: 16, height: 16)
                     
-                    Label("\(String(format: "%.1f", team.pointsPerGame)) PPG", systemImage: "chart.line.uptrend.xyaxis")
+                    Text("\(team.played) GP | \(team.points) PTS | \(String(format: "%.1f", team.pointsPerGame)) PPG")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -101,6 +89,157 @@ struct TeamRowView: View {
             }
         }
         .padding(.vertical, 2)
+    }
+}
+
+func teamLogoURL(for teamName: String) -> String {
+    let normalizedName = teamName.lowercased().trimmingCharacters(in: .whitespaces)
+    print("Looking for logo for team: '\(teamName)' (normalized: '\(normalizedName)')")
+    
+    switch normalizedName {
+    case let name where name.contains("arsenal"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t3.png"
+    case let name where name.contains("chelsea"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t8.png"
+    case let name where name.contains("liverpool"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t14.png"
+    case let name where name.contains("manchester city"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t43.png"
+    case let name where name.contains("manchester united"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t1.png"
+    case let name where name.contains("tottenham"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t6.png"
+    case let name where name.contains("newcastle"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t4.png"
+    case let name where name.contains("brighton"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t36.png"
+    case let name where name.contains("aston villa"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t7.png"
+    case let name where name.contains("west ham"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t21.png"
+    case let name where name.contains("crystal palace"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t31.png"
+    case let name where name.contains("wolves"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t39.png"
+    case let name where name.contains("fulham"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t54.png"
+    case let name where name.contains("brentford"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t94.png"
+    case let name where name.contains("nottingham"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t17.png"
+    case let name where name.contains("everton"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t11.png"
+    case let name where name.contains("bournemouth"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t91.png"
+    case let name where name.contains("luton"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t102.png"
+    case let name where name.contains("burnley"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t90.png"
+    case let name where name.contains("sheffield"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t49.png"
+    case let name where name.contains("leicester"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t13.png"
+    case let name where name.contains("leeds"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t2.png"
+    case let name where name.contains("southampton"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t20.png"
+    default:
+        print("No logo found for team: '\(teamName)'")
+        return ""
+    }
+}
+
+func teamIcon(for teamName: String) -> String {
+    switch teamName.lowercased() {
+    case let name where name.contains("arsenal"):
+        return "shield.fill"
+    case let name where name.contains("chelsea"):
+        return "crown.fill"
+    case let name where name.contains("liverpool"):
+        return "heart.fill"
+    case let name where name.contains("manchester city"):
+        return "star.fill"
+    case let name where name.contains("manchester united"):
+        return "flame.fill"
+    case let name where name.contains("tottenham"):
+        return "bolt.fill"
+    case let name where name.contains("newcastle"):
+        return "n.circle.fill"
+    case let name where name.contains("brighton"):
+        return "sun.max.fill"
+    case let name where name.contains("aston villa"):
+        return "leaf.fill"
+    case let name where name.contains("west ham"):
+        return "hammer.fill"
+    case let name where name.contains("crystal palace"):
+        return "diamond.fill"
+    case let name where name.contains("wolves"):
+        return "pawprint.fill"
+    case let name where name.contains("fulham"):
+        return "house.fill"
+    case let name where name.contains("brentford"):
+        return "hexagon.fill"
+    case let name where name.contains("nottingham"):
+        return "tree.fill"
+    case let name where name.contains("everton"):
+        return "building.columns.fill"
+    case let name where name.contains("bournemouth"):
+        return "circle.fill"
+    case let name where name.contains("luton"):
+        return "h.circle.fill"
+    case let name where name.contains("burnley"):
+        return "flame"
+    case let name where name.contains("sheffield"):
+        return "scissors"
+    default:
+        return "soccerball"
+    }
+}
+
+func teamColor(for teamName: String) -> Color {
+    switch teamName.lowercased() {
+    case let name where name.contains("arsenal"):
+        return .red
+    case let name where name.contains("chelsea"):
+        return .blue
+    case let name where name.contains("liverpool"):
+        return .red
+    case let name where name.contains("manchester city"):
+        return .cyan
+    case let name where name.contains("manchester united"):
+        return .red
+    case let name where name.contains("tottenham"):
+        return .blue
+    case let name where name.contains("newcastle"):
+        return .black
+    case let name where name.contains("brighton"):
+        return .blue
+    case let name where name.contains("aston villa"):
+        return .purple
+    case let name where name.contains("west ham"):
+        return .purple
+    case let name where name.contains("crystal palace"):
+        return .blue
+    case let name where name.contains("wolves"):
+        return .orange
+    case let name where name.contains("fulham"):
+        return .black
+    case let name where name.contains("brentford"):
+        return .red
+    case let name where name.contains("nottingham"):
+        return .red
+    case let name where name.contains("everton"):
+        return .blue
+    case let name where name.contains("bournemouth"):
+        return .red
+    case let name where name.contains("luton"):
+        return .orange
+    case let name where name.contains("burnley"):
+        return .purple
+    case let name where name.contains("sheffield"):
+        return .red
+    default:
+        return .primary
     }
 }
 
