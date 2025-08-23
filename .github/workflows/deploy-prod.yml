@@ -5,7 +5,7 @@ on:
     types: [published]
 
 env:
-  AWS_REGION: us-east-1
+  AWS_REGION: us-west-2
   ENVIRONMENT: prod
 
 jobs:
