@@ -5,7 +5,9 @@ from datetime import datetime, timezone
 from typing import Dict, Any
 from decimal import Decimal
 
-dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
+# Use the region from environment or default to us-east-1 for backward compatibility  
+region = os.environ.get('AWS_REGION', 'us-east-1')
+dynamodb = boto3.resource('dynamodb', region_name=region)
 
 class DecimalEncoder(json.JSONEncoder):
     def default(self, obj):

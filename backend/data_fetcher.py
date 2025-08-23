@@ -8,8 +8,10 @@ from decimal import Decimal
 import icalendar
 from dateutil import tz
 
-dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
-s3 = boto3.client('s3', region_name='us-east-1')
+# Use the region from environment or default to us-east-1 for backward compatibility
+region = os.environ.get('AWS_REGION', 'us-east-1')
+dynamodb = boto3.resource('dynamodb', region_name=region)
+s3 = boto3.client('s3', region_name=region)
 
 def lambda_handler(event, context):
     """
