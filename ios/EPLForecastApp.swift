@@ -1,10 +1,3 @@
-//
-//  EPLForecastApp.swift
-//  EPLForecast
-//
-//  Created by Steve Evans on 8/22/25.
-//
-
 import SwiftUI
 
 @main

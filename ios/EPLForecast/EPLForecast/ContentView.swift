@@ -1,10 +1,21 @@
+//
+//  ContentView.swift
+//  EPLForecast
+//
+//  Created by Steve Evans on 8/22/25.
+//
+
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var eplService = EPLService()
-    
     var body: some View {
-        TableView(eplService: eplService)
+        VStack {
+            Image(systemName: "globe")
+                .imageScale(.large)
+                .foregroundStyle(.tint)
+            Text("Hello, world!")
+        }
+        .padding()
     }
 }
 

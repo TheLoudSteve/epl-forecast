@@ -7,8 +7,8 @@ struct Team: Codable, Identifiable {
     let won: Int
     let drawn: Int
     let lost: Int
-    let goalsFor: Int
-    let goalsAgainst: Int
+    let for: Int
+    let against: Int
     let goalDifference: Int
     let points: Int
     let pointsPerGame: Double
@@ -16,14 +16,10 @@ struct Team: Codable, Identifiable {
     let currentPosition: Int
     let forecastedPosition: Int
     
-    enum CodingKeys: String, CodingKey {
-        case name
-        case played
-        case won
-        case drawn
-        case lost
-        case goalsFor = "for"
-        case goalsAgainst = "against"
+    private enum CodingKeys: String, CodingKey {
+        case name, played, won, drawn, lost
+        case for
+        case against
         case goalDifference = "goal_difference"
         case points
         case pointsPerGame = "points_per_game"
@@ -37,7 +33,7 @@ struct APIResponse: Codable {
     let forecastTable: [Team]
     let metadata: Metadata
     
-    enum CodingKeys: String, CodingKey {
+    private enum CodingKeys: String, CodingKey {
         case forecastTable = "forecast_table"
         case metadata
     }
@@ -49,7 +45,7 @@ struct Metadata: Codable {
     let apiVersion: String
     let description: String
     
-    enum CodingKeys: String, CodingKey {
+    private enum CodingKeys: String, CodingKey {
         case lastUpdated = "last_updated"
         case totalTeams = "total_teams"
         case apiVersion = "api_version"

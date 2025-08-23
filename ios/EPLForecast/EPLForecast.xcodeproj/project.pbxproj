@@ -3,32 +3,66 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		A1234567890123456789001 /* EPLForecastApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890123456789000 /* EPLForecastApp.swift */; };
-		A1234567890123456789003 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890123456789002 /* ContentView.swift */; };
-		A1234567890123456789005 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1234567890123456789004 /* Assets.xcassets */; };
-		A1234567890123456789008 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1234567890123456789007 /* Preview Assets.xcassets */; };
-		A1234567890123456789010 /* EPLService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890123456789009 /* EPLService.swift */; };
-		A1234567890123456789012 /* Team.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890123456789011 /* Team.swift */; };
-		A1234567890123456789014 /* TableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890123456789013 /* TableView.swift */; };
-/* End PBXBuildFile section */
+/* Begin PBXContainerItemProxy section */
+		329D5B652E5945E300705FFB /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 329D5B4F2E5945E000705FFB /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 329D5B562E5945E000705FFB;
+			remoteInfo = EPLForecast;
+		};
+		329D5B6F2E5945E300705FFB /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 329D5B4F2E5945E000705FFB /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 329D5B562E5945E000705FFB;
+			remoteInfo = EPLForecast;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		A1234567890123456788999 /* EPLForecast.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EPLForecast.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A1234567890123456789000 /* EPLForecastApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPLForecastApp.swift; sourceTree = "<group>"; };
-		A1234567890123456789002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		A1234567890123456789004 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		A1234567890123456789007 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		A1234567890123456789009 /* EPLService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPLService.swift; sourceTree = "<group>"; };
-		A1234567890123456789011 /* Team.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Team.swift; sourceTree = "<group>"; };
-		A1234567890123456789013 /* TableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TableView.swift; sourceTree = "<group>"; };
+		329D5B572E5945E000705FFB /* EPLForecast.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EPLForecast.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		329D5B642E5945E300705FFB /* EPLForecastTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EPLForecastTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		329D5B6E2E5945E300705FFB /* EPLForecastUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EPLForecastUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		329D5B592E5945E000705FFB /* EPLForecast */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = EPLForecast;
+			sourceTree = "<group>";
+		};
+		329D5B672E5945E300705FFB /* EPLForecastTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = EPLForecastTests;
+			sourceTree = "<group>";
+		};
+		329D5B712E5945E300705FFB /* EPLForecastUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = EPLForecastUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
 /* Begin PBXFrameworksBuildPhase section */
-		A1234567890123456788996 /* Frameworks */ = {
+		329D5B542E5945E000705FFB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		329D5B612E5945E300705FFB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		329D5B6B2E5945E300705FFB /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -38,126 +72,204 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		A1234567890123456788990 = {
+		329D5B4E2E5945E000705FFB = {
 			isa = PBXGroup;
 			children = (
-				A1234567890123456788995 /* EPLForecast */,
-				A1234567890123456788994 /* Products */,
+				329D5B592E5945E000705FFB /* EPLForecast */,
+				329D5B672E5945E300705FFB /* EPLForecastTests */,
+				329D5B712E5945E300705FFB /* EPLForecastUITests */,
+				329D5B582E5945E000705FFB /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		A1234567890123456788994 /* Products */ = {
+		329D5B582E5945E000705FFB /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A1234567890123456788999 /* EPLForecast.app */,
+				329D5B572E5945E000705FFB /* EPLForecast.app */,
+				329D5B642E5945E300705FFB /* EPLForecastTests.xctest */,
+				329D5B6E2E5945E300705FFB /* EPLForecastUITests.xctest */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		A1234567890123456788995 /* EPLForecast */ = {
-			isa = PBXGroup;
-			children = (
-				A1234567890123456789000 /* EPLForecastApp.swift */,
-				A1234567890123456789002 /* ContentView.swift */,
-				A1234567890123456789013 /* TableView.swift */,
-				A1234567890123456789009 /* EPLService.swift */,
-				A1234567890123456789011 /* Team.swift */,
-				A1234567890123456789004 /* Assets.xcassets */,
-				A1234567890123456789006 /* Preview Content */,
-			);
-			path = EPLForecast;
-			sourceTree = "<group>";
-		};
-		A1234567890123456789006 /* Preview Content */ = {
-			isa = PBXGroup;
-			children = (
-				A1234567890123456789007 /* Preview Assets.xcassets */,
-			);
-			path = "Preview Content";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A1234567890123456788998 /* EPLForecast */ = {
+		329D5B562E5945E000705FFB /* EPLForecast */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A1234567890123456789020 /* Build configuration list for PBXNativeTarget "EPLForecast" */;
+			buildConfigurationList = 329D5B782E5945E300705FFB /* Build configuration list for PBXNativeTarget "EPLForecast" */;
 			buildPhases = (
-				A1234567890123456788995 /* Sources */,
-				A1234567890123456788996 /* Frameworks */,
-				A1234567890123456788997 /* Resources */,
+				329D5B532E5945E000705FFB /* Sources */,
+				329D5B542E5945E000705FFB /* Frameworks */,
+				329D5B552E5945E000705FFB /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
+			fileSystemSynchronizedGroups = (
+				329D5B592E5945E000705FFB /* EPLForecast */,
+			);
 			name = EPLForecast;
+			packageProductDependencies = (
+			);
 			productName = EPLForecast;
-			productReference = A1234567890123456788999 /* EPLForecast.app */;
+			productReference = 329D5B572E5945E000705FFB /* EPLForecast.app */;
 			productType = "com.apple.product-type.application";
+		};
+		329D5B632E5945E300705FFB /* EPLForecastTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 329D5B7B2E5945E300705FFB /* Build configuration list for PBXNativeTarget "EPLForecastTests" */;
+			buildPhases = (
+				329D5B602E5945E300705FFB /* Sources */,
+				329D5B612E5945E300705FFB /* Frameworks */,
+				329D5B622E5945E300705FFB /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				329D5B662E5945E300705FFB /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				329D5B672E5945E300705FFB /* EPLForecastTests */,
+			);
+			name = EPLForecastTests;
+			packageProductDependencies = (
+			);
+			productName = EPLForecastTests;
+			productReference = 329D5B642E5945E300705FFB /* EPLForecastTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		329D5B6D2E5945E300705FFB /* EPLForecastUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 329D5B7E2E5945E300705FFB /* Build configuration list for PBXNativeTarget "EPLForecastUITests" */;
+			buildPhases = (
+				329D5B6A2E5945E300705FFB /* Sources */,
+				329D5B6B2E5945E300705FFB /* Frameworks */,
+				329D5B6C2E5945E300705FFB /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				329D5B702E5945E300705FFB /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				329D5B712E5945E300705FFB /* EPLForecastUITests */,
+			);
+			name = EPLForecastUITests;
+			packageProductDependencies = (
+			);
+			productName = EPLForecastUITests;
+			productReference = 329D5B6E2E5945E300705FFB /* EPLForecastUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		A1234567890123456788991 /* Project object */ = {
+		329D5B4F2E5945E000705FFB /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1500;
-				LastUpgradeCheck = 1500;
+				LastSwiftUpdateCheck = 1640;
+				LastUpgradeCheck = 1640;
 				TargetAttributes = {
-					A1234567890123456788998 = {
-						CreatedOnToolsVersion = 15.0;
+					329D5B562E5945E000705FFB = {
+						CreatedOnToolsVersion = 16.4;
+					};
+					329D5B632E5945E300705FFB = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 329D5B562E5945E000705FFB;
+					};
+					329D5B6D2E5945E300705FFB = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 329D5B562E5945E000705FFB;
 					};
 				};
 			};
-			buildConfigurationList = A1234567890123456788994 /* Build configuration list for PBXProject "EPLForecast" */;
-			compatibilityVersion = "Xcode 14.0";
+			buildConfigurationList = 329D5B522E5945E000705FFB /* Build configuration list for PBXProject "EPLForecast" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 				Base,
 			);
-			mainGroup = A1234567890123456788990;
-			productRefGroup = A1234567890123456788994 /* Products */;
+			mainGroup = 329D5B4E2E5945E000705FFB;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 329D5B582E5945E000705FFB /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A1234567890123456788998 /* EPLForecast */,
+				329D5B562E5945E000705FFB /* EPLForecast */,
+				329D5B632E5945E300705FFB /* EPLForecastTests */,
+				329D5B6D2E5945E300705FFB /* EPLForecastUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		A1234567890123456788997 /* Resources */ = {
+		329D5B552E5945E000705FFB /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A1234567890123456789008 /* Preview Assets.xcassets in Resources */,
-				A1234567890123456789005 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		329D5B622E5945E300705FFB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		329D5B6C2E5945E300705FFB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		A1234567890123456788995 /* Sources */ = {
+		329D5B532E5945E000705FFB /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A1234567890123456789003 /* ContentView.swift in Sources */,
-				A1234567890123456789014 /* TableView.swift in Sources */,
-				A1234567890123456789010 /* EPLService.swift in Sources */,
-				A1234567890123456789012 /* Team.swift in Sources */,
-				A1234567890123456789001 /* EPLForecastApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		329D5B602E5945E300705FFB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		329D5B6A2E5945E300705FFB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		329D5B662E5945E300705FFB /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 329D5B562E5945E000705FFB /* EPLForecast */;
+			targetProxy = 329D5B652E5945E300705FFB /* PBXContainerItemProxy */;
+		};
+		329D5B702E5945E300705FFB /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 329D5B562E5945E000705FFB /* EPLForecast */;
+			targetProxy = 329D5B6F2E5945E300705FFB /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
-		A1234567890123456789018 /* Debug */ = {
+		329D5B762E5945E300705FFB /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -192,6 +304,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = M9GVBNPCHV;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -209,7 +322,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -220,7 +333,7 @@
 			};
 			name = Debug;
 		};
-		A1234567890123456789019 /* Release */ = {
+		329D5B772E5945E300705FFB /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -255,6 +368,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = M9GVBNPCHV;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -266,7 +380,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -276,14 +390,14 @@
 			};
 			name = Release;
 		};
-		A1234567890123456789021 /* Debug */ = {
+		329D5B792E5945E300705FFB /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"EPLForecast/Preview Content\"";
+				DEVELOPMENT_TEAM = M9GVBNPCHV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -296,7 +410,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.eplforecast.EPLForecast;
+				PRODUCT_BUNDLE_IDENTIFIER = com.LoudSteve.EplForecast.EPLForecast;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -304,14 +418,14 @@
 			};
 			name = Debug;
 		};
-		A1234567890123456789022 /* Release */ = {
+		329D5B7A2E5945E300705FFB /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"EPLForecast/Preview Content\"";
+				DEVELOPMENT_TEAM = M9GVBNPCHV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -324,7 +438,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.eplforecast.EPLForecast;
+				PRODUCT_BUNDLE_IDENTIFIER = com.LoudSteve.EplForecast.EPLForecast;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -332,28 +446,118 @@
 			};
 			name = Release;
 		};
+		329D5B7C2E5945E300705FFB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = M9GVBNPCHV;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.LoudSteve.EplForecast.EPLForecastTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/EPLForecast.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/EPLForecast";
+			};
+			name = Debug;
+		};
+		329D5B7D2E5945E300705FFB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = M9GVBNPCHV;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.LoudSteve.EplForecast.EPLForecastTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/EPLForecast.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/EPLForecast";
+			};
+			name = Release;
+		};
+		329D5B7F2E5945E300705FFB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = M9GVBNPCHV;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.LoudSteve.EplForecast.EPLForecastUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = EPLForecast;
+			};
+			name = Debug;
+		};
+		329D5B802E5945E300705FFB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = M9GVBNPCHV;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.LoudSteve.EplForecast.EPLForecastUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = EPLForecast;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A1234567890123456788994 /* Build configuration list for PBXProject "EPLForecast" */ = {
+		329D5B522E5945E000705FFB /* Build configuration list for PBXProject "EPLForecast" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				A1234567890123456789018 /* Debug */,
-				A1234567890123456789019 /* Release */,
+				329D5B762E5945E300705FFB /* Debug */,
+				329D5B772E5945E300705FFB /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A1234567890123456789020 /* Build configuration list for PBXNativeTarget "EPLForecast" */ = {
+		329D5B782E5945E300705FFB /* Build configuration list for PBXNativeTarget "EPLForecast" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				A1234567890123456789021 /* Debug */,
-				A1234567890123456789022 /* Release */,
+				329D5B792E5945E300705FFB /* Debug */,
+				329D5B7A2E5945E300705FFB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		329D5B7B2E5945E300705FFB /* Build configuration list for PBXNativeTarget "EPLForecastTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				329D5B7C2E5945E300705FFB /* Debug */,
+				329D5B7D2E5945E300705FFB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		329D5B7E2E5945E300705FFB /* Build configuration list for PBXNativeTarget "EPLForecastUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				329D5B7F2E5945E300705FFB /* Debug */,
+				329D5B802E5945E300705FFB /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = A1234567890123456788991 /* Project object */;
+	rootObject = 329D5B4F2E5945E000705FFB /* Project object */;
 }
