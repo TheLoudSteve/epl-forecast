@@ -75,10 +75,23 @@ def handle_table_request():
             }
         
         forecast_data = response['Item']['data']
+        print(f"Forecast data keys: {list(forecast_data.keys())}")
+        print(f"Number of teams in forecast: {len(forecast_data.get('teams', []))}")
+        
+        # Convert Decimal values to float for JSON serialization
+        teams_data = []
+        for team in forecast_data.get('teams', []):
+            team_copy = team.copy()
+            # Convert Decimal to float for JSON serialization
+            if 'points_per_game' in team_copy:
+                team_copy['points_per_game'] = float(team_copy['points_per_game'])
+            if 'forecasted_points' in team_copy:
+                team_copy['forecasted_points'] = float(team_copy['forecasted_points'])
+            teams_data.append(team_copy)
         
         # Add API metadata
         api_response = {
-            'forecast_table': forecast_data['teams'],
+            'forecast_table': teams_data,
             'metadata': {
                 'last_updated': forecast_data['last_updated'],
                 'total_teams': forecast_data['total_teams'],
