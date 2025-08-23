@@ -28,7 +28,23 @@ def lambda_handler(event, context):
         
         table = dynamodb.Table(table_name)
         
-        # For now, always update (bypass schedule check for testing)
+        # Check if we should update based on environment
+        environment = os.environ.get('ENVIRONMENT', 'dev')
+        
+        if environment == 'dev':
+            # Test/dev: Only update at scheduled times (12am/12pm UTC)
+            if not is_scheduled_time():
+                print(f"Skipping update - not scheduled time in {environment} environment")
+                return {
+                    'statusCode': 200,
+                    'body': json.dumps({
+                        'message': 'Skipped - not scheduled time',
+                        'timestamp': datetime.now(timezone.utc).isoformat(),
+                        'environment': environment
+                    })
+                }
+        # Production still checks match schedule + scheduled times
+        
         print("Starting data fetch...")
         
         # Fetch current EPL table
@@ -152,6 +168,27 @@ def calculate_forecasts(epl_data: Dict[str, Any]) -> Dict[str, Any]:
         'last_updated': datetime.now(timezone.utc).isoformat(),
         'total_teams': len(teams)
     }
+
+def is_scheduled_time() -> bool:
+    """
+    Check if current time is during scheduled update windows (12am or 12pm UTC)
+    Allows a 30-minute window around each scheduled time
+    """
+    now = datetime.now(timezone.utc)
+    current_hour = now.hour
+    current_minute = now.minute
+    
+    # Check if we're within 30 minutes of 12am (midnight) or 12pm (noon) UTC
+    midnight_window = (current_hour == 23 and current_minute >= 30) or \
+                      (current_hour == 0 and current_minute <= 30)
+                      
+    noon_window = (current_hour == 11 and current_minute >= 30) or \
+                  (current_hour == 12 and current_minute <= 30)
+    
+    is_scheduled = midnight_window or noon_window
+    print(f"Time check - Current: {now.strftime('%H:%M')} UTC, Scheduled: {is_scheduled}")
+    
+    return is_scheduled
 
 def check_if_update_needed(s3_bucket: str) -> bool:
     """
