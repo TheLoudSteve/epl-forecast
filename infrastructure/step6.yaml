@@ -80,7 +80,7 @@ Resources:
       Layers:
         - !If 
           - EnableNewRelic
-          - !Sub 'arn:aws:lambda:${AWS::Region}:451483290750:layer:NewRelicPython311:14'
+          - !Sub 'arn:aws:lambda:${AWS::Region}:451483290750:layer:NewRelicPython39:104'
           - !Ref 'AWS::NoValue'
       Code:
         ZipFile: |
@@ -111,7 +111,7 @@ Resources:
       Layers:
         - !If 
           - EnableNewRelic
-          - !Sub 'arn:aws:lambda:${AWS::Region}:451483290750:layer:NewRelicPython311:14'
+          - !Sub 'arn:aws:lambda:${AWS::Region}:451483290750:layer:NewRelicPython39:104'
           - !Ref 'AWS::NoValue'
       Code:
         ZipFile: |
