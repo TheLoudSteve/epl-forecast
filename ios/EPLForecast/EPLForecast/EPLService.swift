@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import NewRelic
 
 class EPLService: ObservableObject {
     @Published var teams: [Team] = []
@@ -26,44 +27,97 @@ class EPLService: ObservableObject {
         isLoading = true
         errorMessage = nil
         
+        // Track EPL data fetch start
+        NewRelic.recordCustomEvent("EPLDataFetchStart", attributes: [
+            "baseURL": baseURL,
+            "timestamp": Date().timeIntervalSince1970
+        ])
+        
         guard let url = URL(string: "\(baseURL)/table") else {
-            errorMessage = "Invalid URL"
+            let error = "Invalid URL"
+            errorMessage = error
             isLoading = false
+            
+            // Record URL validation error
+            NewRelic.recordCustomEvent("EPLDataFetchError", attributes: [
+                "error": "invalid_url",
+                "url": "\(baseURL)/table"
+            ])
             return
         }
         
+        let startTime = Date()
         URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            let responseTime = Date().timeIntervalSince(startTime) * 1000 // Convert to milliseconds
+            
             DispatchQueue.main.async {
                 self?.isLoading = false
                 
                 if let error = error {
+                    let errorType: String
                     if error.localizedDescription.contains("offline") || error.localizedDescription.contains("network") {
+                        errorType = "network_error"
                         self?.errorMessage = "No internet connection. Please check your network and try again."
                     } else {
+                        errorType = "connection_error"
                         self?.errorMessage = "Connection failed. Please try again later."
                     }
+                    
+                    // Record network error with details
+                    NewRelic.recordCustomEvent("EPLDataFetchError", attributes: [
+                        "error": errorType,
+                        "errorDescription": error.localizedDescription,
+                        "responseTime": responseTime,
+                        "url": self?.baseURL ?? "unknown"
+                    ])
                     return
                 }
                 
                 guard let httpResponse = response as? HTTPURLResponse else {
                     self?.errorMessage = "Unable to connect to server. Please try again."
+                    
+                    // Record response parsing error
+                    NewRelic.recordCustomEvent("EPLDataFetchError", attributes: [
+                        "error": "response_parsing_error",
+                        "responseTime": responseTime
+                    ])
                     return
                 }
                 
                 guard 200...299 ~= httpResponse.statusCode else {
-                    switch httpResponse.statusCode {
+                    let statusCode = httpResponse.statusCode
+                    let errorMessage: String
+                    
+                    switch statusCode {
                     case 500...599:
-                        self?.errorMessage = "Server is temporarily unavailable. Please try again in a few minutes."
+                        errorMessage = "Server is temporarily unavailable. Please try again in a few minutes."
                     case 400...499:
-                        self?.errorMessage = "Unable to load data. Please try again."
+                        errorMessage = "Unable to load data. Please try again."
                     default:
-                        self?.errorMessage = "Something went wrong. Please try again later."
+                        errorMessage = "Something went wrong. Please try again later."
                     }
+                    
+                    self?.errorMessage = errorMessage
+                    
+                    // Record HTTP error with status code
+                    NewRelic.recordCustomEvent("EPLDataFetchError", attributes: [
+                        "error": "http_error",
+                        "statusCode": statusCode,
+                        "errorMessage": errorMessage,
+                        "responseTime": responseTime
+                    ])
                     return
                 }
                 
                 guard let data = data else {
                     self?.errorMessage = "No data available. Please try again."
+                    
+                    // Record no data error
+                    NewRelic.recordCustomEvent("EPLDataFetchError", attributes: [
+                        "error": "no_data",
+                        "responseTime": responseTime,
+                        "statusCode": httpResponse.statusCode
+                    ])
                     return
                 }
                 
@@ -71,9 +125,29 @@ class EPLService: ObservableObject {
                     let apiResponse = try JSONDecoder().decode(APIResponse.self, from: data)
                     self?.teams = apiResponse.forecastTable
                     self?.lastUpdated = self?.formatDate(apiResponse.metadata.lastUpdated)
+                    
+                    // Record successful data fetch
+                    NewRelic.recordCustomEvent("EPLDataFetchSuccess", attributes: [
+                        "responseTime": responseTime,
+                        "statusCode": httpResponse.statusCode,
+                        "teamsCount": apiResponse.forecastTable.count,
+                        "totalTeams": apiResponse.metadata.totalTeams,
+                        "apiVersion": apiResponse.metadata.apiVersion,
+                        "lastUpdated": apiResponse.metadata.lastUpdated
+                    ])
+                    
                 } catch {
                     print("JSON decode error: \(error)")
                     self?.errorMessage = "Unable to process data. The server may be updating. Please try again in a moment."
+                    
+                    // Record JSON parsing error
+                    NewRelic.recordCustomEvent("EPLDataFetchError", attributes: [
+                        "error": "json_parsing_error",
+                        "errorDescription": error.localizedDescription,
+                        "responseTime": responseTime,
+                        "statusCode": httpResponse.statusCode,
+                        "dataSize": data.count
+                    ])
                 }
             }
         }.resume()

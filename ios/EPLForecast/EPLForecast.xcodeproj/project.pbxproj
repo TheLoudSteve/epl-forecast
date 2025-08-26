@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		32861C972E5D372E00B45860 /* NewRelic in Frameworks */ = {isa = PBXBuildFile; productRef = 32861C962E5D372E00B45860 /* NewRelic */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		329D5B652E5945E300705FFB /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				32861C972E5D372E00B45860 /* NewRelic in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +117,7 @@
 			);
 			name = EPLForecast;
 			packageProductDependencies = (
+				32861C962E5D372E00B45860 /* NewRelic */,
 			);
 			productName = EPLForecast;
 			productReference = 329D5B572E5945E000705FFB /* EPLForecast.app */;
@@ -195,6 +201,9 @@
 			);
 			mainGroup = 329D5B4E2E5945E000705FFB;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				32861C952E5D372E00B45860 /* XCRemoteSwiftPackageReference "newrelic-ios-agent-spm" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 329D5B582E5945E000705FFB /* Products */;
 			projectDirPath = "";
@@ -558,6 +567,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		32861C952E5D372E00B45860 /* XCRemoteSwiftPackageReference "newrelic-ios-agent-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/newrelic/newrelic-ios-agent-spm";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 7.5.9;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		32861C962E5D372E00B45860 /* NewRelic */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 32861C952E5D372E00B45860 /* XCRemoteSwiftPackageReference "newrelic-ios-agent-spm" */;
+			productName = NewRelic;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 329D5B4F2E5945E000705FFB /* Project object */;
 }

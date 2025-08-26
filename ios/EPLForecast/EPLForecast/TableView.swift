@@ -1,4 +1,5 @@
 import SwiftUI
+import NewRelic
 
 struct TableView: View {
     @StateObject private var eplService = EPLService()
@@ -48,9 +49,21 @@ struct TableView: View {
                     }
                 }
                 .refreshable {
+                    // Track user-initiated refresh
+                    NewRelic.recordCustomEvent("UserRefresh", attributes: [
+                        "timestamp": Date().timeIntervalSince1970,
+                        "teamsCount": eplService.teams.count
+                    ])
                     eplService.refreshData()
                 }
             }
+        }
+        .onAppear {
+            // Track table view appearance
+            NewRelic.recordCustomEvent("TableViewAppeared", attributes: [
+                "timestamp": Date().timeIntervalSince1970,
+                "teamsLoaded": !eplService.teams.isEmpty
+            ])
         }
     }
 }

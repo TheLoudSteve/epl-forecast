@@ -10,9 +10,19 @@ Parameters:
     Type: String
     NoEcho: true
     Description: RapidAPI key for football data
+  NewRelicAccountId:
+    Type: String
+    Description: New Relic account ID for Lambda monitoring
+    Default: ""
+  NewRelicLicenseKey:
+    Type: String
+    NoEcho: true
+    Description: New Relic license key for Lambda monitoring
+    Default: ""
 
 Conditions:
   IsProduction: !Equals [!Ref Environment, 'prod']
+  EnableNewRelic: !Not [!Equals [!Ref NewRelicAccountId, ""]]
   
 Resources:
   # DynamoDB table for caching EPL data
@@ -63,10 +73,15 @@ Resources:
     Properties:
       FunctionName: !Sub 'epl-data-fetcher-${Environment}'
       Runtime: python3.11
-      Handler: data_fetcher.lambda_handler
+      Handler: !If [EnableNewRelic, 'newrelic_lambda_wrapper.lambda_handler', 'data_fetcher.lambda_handler']
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 300
       MemorySize: 512
+      Layers:
+        - !If 
+          - EnableNewRelic
+          - !Sub 'arn:aws:lambda:${AWS::Region}:451483290750:layer:NewRelicPython311:14'
+          - !Ref 'AWS::NoValue'
       Code:
         ZipFile: |
           import json
@@ -78,6 +93,10 @@ Resources:
           DYNAMODB_TABLE: !Ref EPLDataTable
           S3_BUCKET: !Ref ICSCacheBucket
           RAPIDAPI_KEY: !Ref RapidAPIKey
+          NEW_RELIC_ACCOUNT_ID: !If [EnableNewRelic, !Ref NewRelicAccountId, !Ref 'AWS::NoValue']
+          NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
+          NEW_RELIC_LAMBDA_HANDLER: !If [EnableNewRelic, 'data_fetcher.lambda_handler', !Ref 'AWS::NoValue']
+          NEW_RELIC_LAMBDA_EXTENSION_ENABLED: !If [EnableNewRelic, 'true', !Ref 'AWS::NoValue']
 
   # API handler Lambda function
   APIHandlerFunction:
@@ -85,10 +104,15 @@ Resources:
     Properties:
       FunctionName: !Sub 'epl-api-handler-${Environment}'
       Runtime: python3.11
-      Handler: api_handler.lambda_handler
+      Handler: !If [EnableNewRelic, 'newrelic_lambda_wrapper.lambda_handler', 'api_handler.lambda_handler']
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 30
       MemorySize: 256
+      Layers:
+        - !If 
+          - EnableNewRelic
+          - !Sub 'arn:aws:lambda:${AWS::Region}:451483290750:layer:NewRelicPython311:14'
+          - !Ref 'AWS::NoValue'
       Code:
         ZipFile: |
           import json
@@ -98,6 +122,10 @@ Resources:
         Variables:
           ENVIRONMENT: !Ref Environment
           DYNAMODB_TABLE: !Ref EPLDataTable
+          NEW_RELIC_ACCOUNT_ID: !If [EnableNewRelic, !Ref NewRelicAccountId, !Ref 'AWS::NoValue']
+          NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
+          NEW_RELIC_LAMBDA_HANDLER: !If [EnableNewRelic, 'api_handler.lambda_handler', !Ref 'AWS::NoValue']
+          NEW_RELIC_LAMBDA_EXTENSION_ENABLED: !If [EnableNewRelic, 'true', !Ref 'AWS::NoValue']
 
   # API Gateway
   EPLForecastAPI:
