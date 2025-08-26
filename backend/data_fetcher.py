@@ -43,7 +43,25 @@ def lambda_handler(event, context):
                         'environment': environment
                     })
                 }
-        # Production still checks match schedule + scheduled times
+        else:
+            # Production: Check both scheduled times AND live matches
+            is_scheduled = is_scheduled_time()
+            is_match_happening = check_if_update_needed(s3_bucket)
+            
+            print(f"Production environment - Scheduled time: {is_scheduled}, Match happening: {is_match_happening}")
+            
+            if not is_scheduled and not is_match_happening:
+                print("Skipping update - not scheduled time and no live matches")
+                return {
+                    'statusCode': 200,
+                    'body': json.dumps({
+                        'message': 'Skipped - not scheduled time and no live matches',
+                        'timestamp': datetime.now(timezone.utc).isoformat(),
+                        'environment': environment,
+                        'scheduled_time': is_scheduled,
+                        'match_happening': is_match_happening
+                    })
+                }
         
         print("Starting data fetch...")
         
@@ -220,9 +238,9 @@ def check_if_update_needed(s3_bucket: str) -> bool:
                 if isinstance(start_time, datetime):
                     start_time = start_time.astimezone(london_tz)
                     
-                    # Calculate match window (15 min before to 90+30 min after)
-                    match_start = start_time.replace(minute=start_time.minute - 15)
-                    match_end = start_time.replace(hour=start_time.hour + 2, minute=start_time.minute + 30)
+                    # Calculate match window (5 min before to 3 hours after)
+                    match_start = start_time.replace(minute=start_time.minute - 5)
+                    match_end = start_time.replace(hour=start_time.hour + 3)
                     
                     if match_start <= now <= match_end:
                         return True

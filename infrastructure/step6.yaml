@@ -10,6 +10,9 @@ Parameters:
     Type: String
     NoEcho: true
     Description: RapidAPI key for football data
+
+Conditions:
+  IsProduction: !Equals [!Ref Environment, 'prod']
   
 Resources:
   # DynamoDB table for caching EPL data
@@ -188,6 +191,30 @@ Resources:
     Properties:
       RestApiId: !Ref EPLForecastAPI
       StageName: !Ref Environment
+
+  # EventBridge rule to trigger data fetcher (frequency depends on environment)
+  DataFetcherScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub 'epl-data-fetcher-schedule-${Environment}'
+      Description: !Sub 'Trigger EPL data fetcher - ${Environment} environment'
+      ScheduleExpression: !If 
+        - IsProduction
+        - 'rate(2 minutes)'
+        - 'rate(1 hour)'
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt DataFetcherFunction.Arn
+          Id: 'DataFetcherTarget'
+
+  # Permission for EventBridge to invoke the Lambda function
+  DataFetcherSchedulePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref DataFetcherFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt DataFetcherScheduleRule.Arn
 
 Outputs:
   DynamoDBTable:
