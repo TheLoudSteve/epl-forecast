@@ -5,6 +5,18 @@ from datetime import datetime, timezone
 from typing import Dict, Any
 from decimal import Decimal
 
+# New Relic monitoring
+try:
+    import newrelic.agent
+    # Initialize if environment variables are set
+    if os.environ.get('NEW_RELIC_LICENSE_KEY'):
+        newrelic.agent.initialize()
+        NEW_RELIC_ENABLED = True
+    else:
+        NEW_RELIC_ENABLED = False
+except ImportError:
+    NEW_RELIC_ENABLED = False
+
 # Use the region from environment or default to us-east-1 for backward compatibility  
 region = os.environ.get('AWS_REGION', 'us-east-1')
 dynamodb = boto3.resource('dynamodb', region_name=region)
@@ -15,6 +27,7 @@ class DecimalEncoder(json.JSONEncoder):
             return float(obj)
         return super(DecimalEncoder, self).default(obj)
 
+@newrelic.agent.lambda_handler() if NEW_RELIC_ENABLED else lambda x: x
 def lambda_handler(event, context):
     """
     Lambda function to handle API requests
@@ -22,6 +35,12 @@ def lambda_handler(event, context):
     try:
         path = event.get('path', '')
         http_method = event.get('httpMethod', '')
+        
+        # Add New Relic custom attributes
+        if NEW_RELIC_ENABLED:
+            newrelic.agent.add_custom_attribute('api.path', path)
+            newrelic.agent.add_custom_attribute('api.method', http_method)
+            newrelic.agent.add_custom_attribute('lambda.environment', os.environ.get('ENVIRONMENT', 'unknown'))
         
         if path == '/health' and http_method == 'GET':
             return handle_health_check()

@@ -8,17 +8,35 @@ from decimal import Decimal
 import icalendar
 from dateutil import tz
 
+# New Relic monitoring
+try:
+    import newrelic.agent
+    # Initialize if environment variables are set
+    if os.environ.get('NEW_RELIC_LICENSE_KEY'):
+        newrelic.agent.initialize()
+        NEW_RELIC_ENABLED = True
+    else:
+        NEW_RELIC_ENABLED = False
+except ImportError:
+    NEW_RELIC_ENABLED = False
+
 # Use the region from environment or default to us-east-1 for backward compatibility
 region = os.environ.get('AWS_REGION', 'us-east-1')
 dynamodb = boto3.resource('dynamodb', region_name=region)
 s3 = boto3.client('s3', region_name=region)
 
+@newrelic.agent.lambda_handler() if NEW_RELIC_ENABLED else lambda x: x
 def lambda_handler(event, context):
     """
     Lambda function to fetch EPL data and calculate forecasts
     """
     try:
         print(f"Lambda triggered with event: {event}")
+        
+        # Add New Relic custom attributes
+        if NEW_RELIC_ENABLED:
+            newrelic.agent.add_custom_attribute('lambda.event_type', event.get('source', 'unknown'))
+            newrelic.agent.add_custom_attribute('lambda.environment', os.environ.get('ENVIRONMENT', 'unknown'))
         
         table_name = os.environ['DYNAMODB_TABLE']
         s3_bucket = os.environ['S3_BUCKET']

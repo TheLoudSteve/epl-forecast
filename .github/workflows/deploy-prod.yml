@@ -76,8 +76,8 @@ jobs:
             Environment=${{ env.ENVIRONMENT }} \
             RapidAPIKey=${{ secrets.RAPIDAPI_KEY }} \
             S3BucketName=$BUCKET_NAME \
-            NewRelicAccountId="" \
-            NewRelicLicenseKey="" \
+            NewRelicAccountId=${{ secrets.NEW_RELIC_ACCOUNT_ID }} \
+            NewRelicLicenseKey=${{ secrets.NEW_RELIC_LICENSE_KEY }} \
           --capabilities CAPABILITY_IAM \
           --region ${{ env.AWS_REGION }}
     
