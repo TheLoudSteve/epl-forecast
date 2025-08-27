@@ -103,15 +103,15 @@ jobs:
       run: |
         cd backend
         pip install -r requirements.txt -t .
-        zip -r data_fetcher.zip data_fetcher.py boto3* requests* icalendar* dateutil* six* urllib3* botocore* jmespath* s3transfer* certifi* charset_normalizer* idna* pytz* recurring_ical_events*
+        zip -r scheduled_data_fetcher.zip scheduled_data_fetcher.py boto3* requests* dateutil* six* urllib3* botocore* jmespath* s3transfer* certifi* charset_normalizer* idna*
         zip -r api_handler.zip api_handler.py boto3* botocore* jmespath* s3transfer* urllib3* certifi* dateutil* six*
     
     - name: Update Lambda functions
       run: |
         cd backend
         aws lambda update-function-code \
-          --function-name epl-data-fetcher-${{ env.ENVIRONMENT }} \
-          --zip-file fileb://data_fetcher.zip
+          --function-name epl-scheduled-fetcher-${{ env.ENVIRONMENT }} \
+          --zip-file fileb://scheduled_data_fetcher.zip
         
         aws lambda update-function-code \
           --function-name epl-api-handler-${{ env.ENVIRONMENT }} \

@@ -67,13 +67,13 @@ Resources:
         - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
         - arn:aws:iam::aws:policy/AmazonS3FullAccess
 
-  # Data fetcher Lambda function
-  DataFetcherFunction:
+  # Scheduled data fetcher Lambda function (2x daily)
+  ScheduledDataFetcherFunction:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub 'epl-data-fetcher-${Environment}'
+      FunctionName: !Sub 'epl-scheduled-fetcher-${Environment}'
       Runtime: python3.11
-      Handler: data_fetcher.lambda_handler
+      Handler: scheduled_data_fetcher.lambda_handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 300
       MemorySize: 512
@@ -81,7 +81,33 @@ Resources:
         ZipFile: |
           import json
           def lambda_handler(event, context):
-              return {'statusCode': 200, 'body': json.dumps('Data fetcher placeholder')}
+              return {'statusCode': 200, 'body': json.dumps('Scheduled fetcher placeholder')}
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          DYNAMODB_TABLE: !Ref EPLDataTable
+          RAPIDAPI_KEY: !Ref RapidAPIKey
+          NEW_RELIC_ACCOUNT_ID: !If [EnableNewRelic, !Ref NewRelicAccountId, !Ref 'AWS::NoValue']
+          NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
+          NEW_RELIC_LAMBDA_HANDLER: !If [EnableNewRelic, 'scheduled_data_fetcher.lambda_handler', !Ref 'AWS::NoValue']
+          NEW_RELIC_LAMBDA_EXTENSION_ENABLED: !If [EnableNewRelic, 'true', !Ref 'AWS::NoValue']
+
+  # Live match fetcher Lambda function (every 2 minutes in prod only)
+  LiveMatchFetcherFunction:
+    Type: AWS::Lambda::Function
+    Condition: IsProduction
+    Properties:
+      FunctionName: !Sub 'epl-live-fetcher-${Environment}'
+      Runtime: python3.11
+      Handler: live_match_fetcher.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 300
+      MemorySize: 512
+      Code:
+        ZipFile: |
+          import json
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': json.dumps('Live match fetcher placeholder')}
       Environment:
         Variables:
           ENVIRONMENT: !Ref Environment
@@ -90,7 +116,7 @@ Resources:
           RAPIDAPI_KEY: !Ref RapidAPIKey
           NEW_RELIC_ACCOUNT_ID: !If [EnableNewRelic, !Ref NewRelicAccountId, !Ref 'AWS::NoValue']
           NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
-          NEW_RELIC_LAMBDA_HANDLER: !If [EnableNewRelic, 'data_fetcher.lambda_handler', !Ref 'AWS::NoValue']
+          NEW_RELIC_LAMBDA_HANDLER: !If [EnableNewRelic, 'live_match_fetcher.lambda_handler', !Ref 'AWS::NoValue']
           NEW_RELIC_LAMBDA_EXTENSION_ENABLED: !If [EnableNewRelic, 'true', !Ref 'AWS::NoValue']
 
   # API handler Lambda function
@@ -210,29 +236,49 @@ Resources:
       RestApiId: !Ref EPLForecastAPI
       StageName: !Ref Environment
 
-  # EventBridge rule to trigger data fetcher (frequency depends on environment)
-  DataFetcherScheduleRule:
+  # EventBridge rule for scheduled data fetcher (2x daily at 00:00 and 12:00 UTC)
+  ScheduledDataFetcherRule:
     Type: AWS::Events::Rule
     Properties:
-      Name: !Sub 'epl-data-fetcher-schedule-${Environment}'
-      Description: !Sub 'Trigger EPL data fetcher - ${Environment} environment'
-      ScheduleExpression: !If 
-        - IsProduction
-        - 'rate(2 minutes)'
-        - 'rate(1 hour)'
+      Name: !Sub 'epl-scheduled-fetcher-${Environment}'
+      Description: 'Trigger EPL scheduled data fetcher at 00:00 and 12:00 UTC'
+      ScheduleExpression: 'cron(0 0,12 * * ? *)'
       State: ENABLED
       Targets:
-        - Arn: !GetAtt DataFetcherFunction.Arn
-          Id: 'DataFetcherTarget'
+        - Arn: !GetAtt ScheduledDataFetcherFunction.Arn
+          Id: 'ScheduledDataFetcherTarget'
 
-  # Permission for EventBridge to invoke the Lambda function
-  DataFetcherSchedulePermission:
+  # Permission for EventBridge to invoke the scheduled Lambda function
+  ScheduledDataFetcherPermission:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName: !Ref DataFetcherFunction
+      FunctionName: !Ref ScheduledDataFetcherFunction
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
-      SourceArn: !GetAtt DataFetcherScheduleRule.Arn
+      SourceArn: !GetAtt ScheduledDataFetcherRule.Arn
+
+  # EventBridge rule for live match fetcher (every 2 minutes, production only)
+  LiveMatchFetcherRule:
+    Type: AWS::Events::Rule
+    Condition: IsProduction
+    Properties:
+      Name: !Sub 'epl-live-fetcher-${Environment}'
+      Description: 'Trigger EPL live match fetcher every 2 minutes in production'
+      ScheduleExpression: 'rate(2 minutes)'
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LiveMatchFetcherFunction.Arn
+          Id: 'LiveMatchFetcherTarget'
+
+  # Permission for EventBridge to invoke the live match Lambda function
+  LiveMatchFetcherPermission:
+    Type: AWS::Lambda::Permission
+    Condition: IsProduction
+    Properties:
+      FunctionName: !Ref LiveMatchFetcherFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt LiveMatchFetcherRule.Arn
 
 Outputs:
   DynamoDBTable:
@@ -253,11 +299,18 @@ Outputs:
     Export:
       Name: !Sub '${AWS::StackName}-LambdaRole'
 
-  DataFetcherFunction:
-    Description: Data fetcher Lambda function name
-    Value: !Ref DataFetcherFunction
+  ScheduledDataFetcherFunction:
+    Description: Scheduled data fetcher Lambda function name
+    Value: !Ref ScheduledDataFetcherFunction
     Export:
-      Name: !Sub '${AWS::StackName}-DataFetcherFunction'
+      Name: !Sub '${AWS::StackName}-ScheduledDataFetcherFunction'
+
+  LiveMatchFetcherFunction:
+    Condition: IsProduction
+    Description: Live match fetcher Lambda function name
+    Value: !Ref LiveMatchFetcherFunction
+    Export:
+      Name: !Sub '${AWS::StackName}-LiveMatchFetcherFunction'
 
   APIHandlerFunction:
     Description: API handler Lambda function name
