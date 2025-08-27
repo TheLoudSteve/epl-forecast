@@ -407,6 +407,9 @@ Resources:
           SizeInMBs: 1
           IntervalInSeconds: 60
         RoleARN: !GetAtt NewRelicFirehoseRole.Arn
+        ProcessingConfiguration:
+          Enabled: false
+        S3BackupMode: FailedDataOnly
         S3Configuration:
           RoleARN: !GetAtt NewRelicFirehoseRole.Arn
           BucketARN: !GetAtt NewRelicBackupBucket.Arn
