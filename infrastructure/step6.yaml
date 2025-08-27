@@ -416,10 +416,7 @@ Resources:
     Type: AWS::CloudWatch::MetricStream  
     Condition: EnableMetricStreams
     Properties:
-      Name: !If 
-        - IsProduction
-        - 'Steve-AWS-MetricStreams-2025Aug27D06H37M43S'
-        - !Sub 'NewRelic-MetricStream-${Environment}'
+      Name: 'NR-AWS-MetricStreams'
       FirehoseArn: !GetAtt NewRelicFirehoseDeliveryStream.Arn
       RoleArn: !GetAtt NewRelicMetricStreamRole.Arn
       OutputFormat: opentelemetry0.7
