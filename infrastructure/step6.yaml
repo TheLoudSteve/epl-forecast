@@ -28,7 +28,7 @@ Parameters:
 Conditions:
   IsProduction: !Equals [!Ref Environment, 'prod']
   EnableNewRelic: !Not [!Equals [!Ref NewRelicAccountId, ""]]
-  EnableMetricStreams: !Not [!Equals [!Ref NewRelicIngestKey, ""]]
+  EnableMetricStreams: !Equals [!Ref Environment, "disable-for-now"]
   
 Resources:
   # DynamoDB table for caching EPL data
