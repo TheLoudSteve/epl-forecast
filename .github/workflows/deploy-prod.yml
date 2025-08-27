@@ -82,7 +82,8 @@ jobs:
             S3BucketName=$BUCKET_NAME \
             NewRelicAccountId=${{ secrets.NEW_RELIC_ACCOUNT_ID }} \
             NewRelicLicenseKey=${{ secrets.NEW_RELIC_LICENSE_KEY }} \
-          --capabilities CAPABILITY_IAM \
+            NewRelicIngestKey=${{ secrets.NEW_RELIC_INGEST_KEY }} \
+          --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
           --region ${{ env.AWS_REGION }}
     
     - name: Update Lambda function code
