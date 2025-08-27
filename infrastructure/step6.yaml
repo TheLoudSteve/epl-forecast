@@ -330,8 +330,16 @@ Resources:
             Principal:
               Service: streams.metrics.cloudwatch.amazonaws.com
             Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/CloudWatchMetricStreamsRole
+      Policies:
+        - PolicyName: CloudWatchMetricStreamsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - firehose:PutRecord
+                  - firehose:PutRecordBatch
+                Resource: !GetAtt NewRelicFirehoseDeliveryStream.Arn
 
   NewRelicFirehoseRole:
     Type: AWS::IAM::Role
