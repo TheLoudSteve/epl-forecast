@@ -38,7 +38,7 @@ jobs:
         file: ./backend/coverage.xml
 
   deploy-infrastructure:
-    # needs: test  # Temporarily disabled to fix deployment
+    needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
@@ -73,11 +73,11 @@ jobs:
           --template-file infrastructure/step6.yaml \
           --stack-name epl-forecast-${{ env.ENVIRONMENT }} \
           --parameter-overrides \
-            Environment=${{ env.ENVIRONMENT }} \
-            RapidAPIKey=${{ secrets.RAPIDAPI_KEY }} \
-            NewRelicAccountId=${{ secrets.NEW_RELIC_ACCOUNT_ID }} \
-            NewRelicLicenseKey=${{ secrets.NEW_RELIC_LICENSE_KEY }} \
-            NewRelicIngestKey=${{ secrets.NEW_RELIC_INGEST_KEY }} \
+            "Environment=${{ env.ENVIRONMENT }}" \
+            "RapidAPIKey=${{ secrets.RAPIDAPI_KEY }}" \
+            "NewRelicAccountId=${{ secrets.NEW_RELIC_ACCOUNT_ID }}" \
+            "NewRelicLicenseKey=${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
+            "NewRelicIngestKey=${{ secrets.NEW_RELIC_INGEST_KEY }}" \
           --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
           --region ${{ env.AWS_REGION }}
 
