@@ -77,6 +77,7 @@ jobs:
             RapidAPIKey=${{ secrets.RAPIDAPI_KEY }} \
             NewRelicAccountId=${{ secrets.NEW_RELIC_ACCOUNT_ID }} \
             NewRelicLicenseKey=${{ secrets.NEW_RELIC_LICENSE_KEY }} \
+            NewRelicIngestKey=${{ secrets.NEW_RELIC_INGEST_KEY }} \
           --capabilities CAPABILITY_IAM \
           --region ${{ env.AWS_REGION }}
 
@@ -130,9 +131,9 @@ jobs:
     - name: Trigger initial data fetch
       run: |
         aws lambda invoke \
-          --function-name epl-data-fetcher-${{ env.ENVIRONMENT }} \
+          --function-name epl-scheduled-fetcher-${{ env.ENVIRONMENT }} \
           --region ${{ env.AWS_REGION }} \
           --payload '{}' \
           response.json
-        echo "Data fetcher response:"
+        echo "Scheduled data fetcher response:"
         cat response.json
