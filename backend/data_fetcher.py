@@ -2,7 +2,7 @@ import json
 import os
 import boto3
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Any
 from decimal import Decimal
 import icalendar
@@ -208,21 +208,22 @@ def calculate_forecasts(epl_data: Dict[str, Any]) -> Dict[str, Any]:
 def is_scheduled_time() -> bool:
     """
     Check if current time is during scheduled update windows (12am or 12pm UTC)
-    Allows a 30-minute window around each scheduled time
+    Allows a 15-minute window around each scheduled time
     """
     now = datetime.now(timezone.utc)
     current_hour = now.hour
     current_minute = now.minute
     
-    # Check if we're within 30 minutes of 12am (midnight) or 12pm (noon) UTC
-    midnight_window = (current_hour == 23 and current_minute >= 30) or \
-                      (current_hour == 0 and current_minute <= 30)
+    # Check if we're within 15 minutes of 12am (midnight) UTC: 23:45-00:15
+    midnight_window = (current_hour == 23 and current_minute >= 45) or \
+                      (current_hour == 0 and current_minute <= 15)
                       
-    noon_window = (current_hour == 11 and current_minute >= 30) or \
-                  (current_hour == 12 and current_minute <= 30)
+    # Check if we're within 15 minutes of 12pm (noon) UTC: 11:45-12:15
+    noon_window = (current_hour == 11 and current_minute >= 45) or \
+                  (current_hour == 12 and current_minute <= 15)
     
     is_scheduled = midnight_window or noon_window
-    print(f"Time check - Current: {now.strftime('%H:%M')} UTC, Scheduled: {is_scheduled}")
+    print(f"Time check - Current: {now.strftime('%H:%M')} UTC, Midnight: {midnight_window}, Noon: {noon_window}, Scheduled: {is_scheduled}")
     
     return is_scheduled
 
@@ -257,8 +258,8 @@ def check_if_update_needed(s3_bucket: str) -> bool:
                     start_time = start_time.astimezone(london_tz)
                     
                     # Calculate match window (5 min before to 3 hours after)
-                    match_start = start_time.replace(minute=start_time.minute - 5)
-                    match_end = start_time.replace(hour=start_time.hour + 3)
+                    match_start = start_time - timedelta(minutes=5)
+                    match_end = start_time + timedelta(hours=3)
                     
                     if match_start <= now <= match_end:
                         return True
@@ -267,8 +268,8 @@ def check_if_update_needed(s3_bucket: str) -> bool:
         
     except Exception as e:
         print(f"Error checking ICS feed: {str(e)}")
-        # If we can't check, assume we should update
-        return True
+        # If we can't check, assume no matches are happening to avoid excessive API calls
+        return False
 
 def store_data(table, data: Dict[str, Any]) -> None:
     """
