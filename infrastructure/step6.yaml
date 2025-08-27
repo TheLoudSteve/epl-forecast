@@ -406,9 +406,8 @@ Resources:
         BufferingHints:
           SizeInMBs: 1
           IntervalInSeconds: 60
-        RetryConfiguration:
-          DurationInSeconds: 3600
         RoleARN: !GetAtt NewRelicFirehoseRole.Arn
+        RetryDuration: 3600
         S3Configuration:
           RoleARN: !GetAtt NewRelicFirehoseRole.Arn
           BucketARN: !GetAtt NewRelicBackupBucket.Arn
