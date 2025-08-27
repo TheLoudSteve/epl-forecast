@@ -361,18 +361,15 @@ Resources:
               - Effect: Allow
                 Action:
                   - s3:GetBucketLocation
-                  - s3:GetObject
                   - s3:ListBucket
-                Resource: !Sub '${NewRelicBackupBucket}*'
+                Resource: !GetAtt NewRelicBackupBucket.Arn
               - Effect: Allow
                 Action:
                   - s3:AbortMultipartUpload
-                  - s3:GetBucketLocation  
                   - s3:GetObject
-                  - s3:ListBucket
                   - s3:ListBucketMultipartUploads
                   - s3:PutObject
-                Resource: !Sub '${NewRelicBackupBucket}*'
+                Resource: !Sub '${NewRelicBackupBucket.Arn}/*'
 
   NewRelicBackupBucket:
     Type: AWS::S3::Bucket
