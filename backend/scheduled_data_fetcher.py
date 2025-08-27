@@ -92,15 +92,44 @@ def fetch_epl_data(rapidapi_key: str) -> Dict[str, Any]:
     print(f"Headers: X-RapidAPI-Host: {headers['X-RapidAPI-Host']}")
     print(f"Params: {querystring}")
     
+    # Record New Relic custom metric for RapidAPI call
+    environment = os.environ.get('ENVIRONMENT', 'unknown')
+    if NEW_RELIC_ENABLED:
+        newrelic.agent.record_custom_metric('Custom/RapidAPI/CallMade', 1)
+        newrelic.agent.add_custom_attribute('rapidapi.call_reason', 'scheduled_update')
+        newrelic.agent.add_custom_attribute('rapidapi.environment', environment)
+        newrelic.agent.add_custom_attribute('rapidapi.url', url)
+        newrelic.agent.add_custom_attribute('rapidapi.timestamp', datetime.now(timezone.utc).isoformat())
+    
+    start_time = datetime.now(timezone.utc)
     response = requests.get(url, headers=headers, params=querystring, timeout=30)
+    end_time = datetime.now(timezone.utc)
+    response_time_ms = (end_time - start_time).total_seconds() * 1000
+    
     print(f"API Response Status: {response.status_code}")
+    print(f"API Response Time: {response_time_ms:.2f}ms")
     print(f"API Response Headers: {dict(response.headers)}")
+    
+    # Record response metrics
+    if NEW_RELIC_ENABLED:
+        newrelic.agent.record_custom_metric('Custom/RapidAPI/ResponseTime', response_time_ms)
+        newrelic.agent.record_custom_metric(f'Custom/RapidAPI/StatusCode/{response.status_code}', 1)
+        newrelic.agent.add_custom_attribute('rapidapi.response_status', response.status_code)
+        newrelic.agent.add_custom_attribute('rapidapi.response_time_ms', response_time_ms)
     
     response.raise_for_status()
     
     data = response.json()
     print(f"API Response Data keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
     print(f"API Response sample: {str(data)[:500]}...")
+    
+    # Record successful API call metrics
+    if NEW_RELIC_ENABLED:
+        teams_count = len(data.get('league-table', {}).get('teams', []))
+        if teams_count == 0 and 'table' in data:
+            teams_count = len(data.get('table', []))
+        newrelic.agent.record_custom_metric('Custom/RapidAPI/TeamsReturned', teams_count)
+        newrelic.agent.add_custom_attribute('rapidapi.teams_count', teams_count)
     
     return data
 

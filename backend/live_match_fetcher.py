@@ -46,18 +46,28 @@ def lambda_handler(event, context):
         print(f"Environment variables - Table: {table_name}, Bucket: {s3_bucket}")
         
         # Check if we should update based on live matches
-        match_happening = check_if_match_happening(s3_bucket)
+        match_result = check_if_match_happening(s3_bucket)
+        match_happening = match_result.get('happening', False)
+        match_context = match_result.get('context', 'No matches detected')
         
         print(f"Live match check result: {match_happening}")
+        print(f"Match context: {match_context}")
         
         if not match_happening:
             print("No live matches detected - skipping API call")
+            # Record New Relic metric for skipped call
+            if NEW_RELIC_ENABLED:
+                newrelic.agent.record_custom_metric('Custom/RapidAPI/CallSkipped', 1)
+                newrelic.agent.add_custom_attribute('rapidapi.skip_reason', 'no_live_matches')
+                newrelic.agent.add_custom_attribute('rapidapi.environment', os.environ.get('ENVIRONMENT', 'unknown'))
+                
             return {
                 'statusCode': 200,
                 'body': json.dumps({
                     'message': 'No live matches - skipped API call',
                     'timestamp': datetime.now(timezone.utc).isoformat(),
-                    'match_happening': False
+                    'match_happening': False,
+                    'match_context': match_context
                 })
             }
         
@@ -66,8 +76,8 @@ def lambda_handler(event, context):
         
         table = dynamodb.Table(table_name)
         
-        # Fetch current EPL table
-        epl_data = fetch_epl_data(rapidapi_key)
+        # Fetch current EPL table with match context
+        epl_data = fetch_epl_data(rapidapi_key, match_context)
         print(f"Fetched EPL data with {len(epl_data.get('table', []))} teams")
         
         # Calculate forecasts
@@ -98,10 +108,11 @@ def lambda_handler(event, context):
             })
         }
 
-def check_if_match_happening(s3_bucket: str) -> bool:
+def check_if_match_happening(s3_bucket: str) -> Dict[str, Any]:
     """
     Check ICS feed to determine if matches are happening
     Match window: 15 minutes before kickoff to 30 minutes after final whistle
+    Returns dict with 'happening' boolean and 'context' string
     """
     try:
         # Fetch ICS feed
@@ -126,6 +137,8 @@ def check_if_match_happening(s3_bucket: str) -> bool:
         
         # Check for matches in the specified window
         matches_found = 0
+        active_matches = []
+        
         for component in cal.walk():
             if component.name == "VEVENT":
                 start_time = component.get('dtstart').dt
@@ -141,21 +154,46 @@ def check_if_match_happening(s3_bucket: str) -> bool:
                     
                     if match_start <= now <= match_end:
                         match_summary = component.get('summary', 'Unknown Match')
+                        active_matches.append({
+                            'summary': match_summary,
+                            'start_time': start_time.strftime('%Y-%m-%d %H:%M %Z'),
+                            'status': 'live' if start_time <= now else 'pre-match'
+                        })
                         print(f"LIVE MATCH DETECTED: {match_summary}")
                         print(f"  Start: {start_time.strftime('%Y-%m-%d %H:%M %Z')}")
                         print(f"  Window: {match_start.strftime('%H:%M')} - {match_end.strftime('%H:%M')}")
                         print(f"  Current: {now.strftime('%H:%M')}")
-                        return True
         
-        print(f"No live matches found (checked {matches_found} total matches)")
-        return False
+        if active_matches:
+            context = f"{len(active_matches)} active match(es): " + ", ".join([m['summary'] for m in active_matches])
+            return {
+                'happening': True,
+                'context': context,
+                'matches': active_matches,
+                'total_matches_checked': matches_found
+            }
+        else:
+            context = f"No live matches (checked {matches_found} total matches)"
+            print(context)
+            return {
+                'happening': False,
+                'context': context,
+                'matches': [],
+                'total_matches_checked': matches_found
+            }
         
     except Exception as e:
-        print(f"Error checking ICS feed: {str(e)}")
+        error_context = f"Error checking ICS feed: {str(e)}"
+        print(error_context)
         # Conservative approach: if we can't check, don't make unnecessary API calls
-        return False
+        return {
+            'happening': False,
+            'context': error_context,
+            'matches': [],
+            'total_matches_checked': 0
+        }
 
-def fetch_epl_data(rapidapi_key: str) -> Dict[str, Any]:
+def fetch_epl_data(rapidapi_key: str, match_context: str = "") -> Dict[str, Any]:
     """
     Fetch current EPL table from RapidAPI
     """
@@ -168,14 +206,47 @@ def fetch_epl_data(rapidapi_key: str) -> Dict[str, Any]:
     }
     
     print(f"Calling RapidAPI for live match data: {url}")
+    print(f"Match context: {match_context}")
     
+    # Record New Relic custom metric for RapidAPI call
+    environment = os.environ.get('ENVIRONMENT', 'unknown')
+    if NEW_RELIC_ENABLED:
+        newrelic.agent.record_custom_metric('Custom/RapidAPI/CallMade', 1)
+        newrelic.agent.record_custom_metric('Custom/RapidAPI/LiveMatchCall', 1)
+        newrelic.agent.add_custom_attribute('rapidapi.call_reason', 'live_match_update')
+        newrelic.agent.add_custom_attribute('rapidapi.environment', environment)
+        newrelic.agent.add_custom_attribute('rapidapi.url', url)
+        newrelic.agent.add_custom_attribute('rapidapi.match_context', match_context)
+        newrelic.agent.add_custom_attribute('rapidapi.timestamp', datetime.now(timezone.utc).isoformat())
+    
+    start_time = datetime.now(timezone.utc)
     response = requests.get(url, headers=headers, params=querystring, timeout=30)
+    end_time = datetime.now(timezone.utc)
+    response_time_ms = (end_time - start_time).total_seconds() * 1000
+    
     print(f"API Response Status: {response.status_code}")
+    print(f"API Response Time: {response_time_ms:.2f}ms")
+    
+    # Record response metrics
+    if NEW_RELIC_ENABLED:
+        newrelic.agent.record_custom_metric('Custom/RapidAPI/ResponseTime', response_time_ms)
+        newrelic.agent.record_custom_metric(f'Custom/RapidAPI/StatusCode/{response.status_code}', 1)
+        newrelic.agent.record_custom_metric('Custom/RapidAPI/LiveMatchResponseTime', response_time_ms)
+        newrelic.agent.add_custom_attribute('rapidapi.response_status', response.status_code)
+        newrelic.agent.add_custom_attribute('rapidapi.response_time_ms', response_time_ms)
     
     response.raise_for_status()
     
     data = response.json()
     print(f"API Response Data keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
+    
+    # Record successful API call metrics
+    if NEW_RELIC_ENABLED:
+        teams_count = len(data.get('league-table', {}).get('teams', []))
+        if teams_count == 0 and 'table' in data:
+            teams_count = len(data.get('table', []))
+        newrelic.agent.record_custom_metric('Custom/RapidAPI/TeamsReturned', teams_count)
+        newrelic.agent.add_custom_attribute('rapidapi.teams_count', teams_count)
     
     return data
 
