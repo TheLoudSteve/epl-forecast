@@ -19,10 +19,16 @@ Parameters:
     NoEcho: true
     Description: New Relic license key for Lambda monitoring
     Default: ""
+  NewRelicIngestKey:
+    Type: String
+    NoEcho: true
+    Description: New Relic ingest license key for CloudWatch Metric Streams
+    Default: ""
 
 Conditions:
   IsProduction: !Equals [!Ref Environment, 'prod']
   EnableNewRelic: !Not [!Equals [!Ref NewRelicAccountId, ""]]
+  EnableMetricStreams: !Not [!Equals [!Ref NewRelicIngestKey, ""]]
   
 Resources:
   # DynamoDB table for caching EPL data
@@ -66,6 +72,37 @@ Resources:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
         - arn:aws:iam::aws:policy/AmazonS3FullAccess
+
+  # IAM role for New Relic AWS integration (API polling)
+  NewRelicInfrastructureRole:
+    Type: AWS::IAM::Role
+    Condition: EnableNewRelic
+    Properties:
+      RoleName: !Sub 'NewRelicInfrastructure-Integrations-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: arn:aws:iam::754728514883:root
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref NewRelicAccountId
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
+      Policies:
+        - PolicyName: NewRelicAPIGatewayPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - apigateway:GET
+                  - apigateway:HEAD
+                  - apigateway:OPTIONS
+                  - tag:GetResources
+                Resource: '*'
 
   # Scheduled data fetcher Lambda function (2x daily)
   ScheduledDataFetcherFunction:
@@ -280,6 +317,120 @@ Resources:
       Principal: events.amazonaws.com
       SourceArn: !GetAtt LiveMatchFetcherRule.Arn
 
+  # New Relic CloudWatch Metric Streams Integration
+  NewRelicMetricStreamRole:
+    Type: AWS::IAM::Role
+    Condition: EnableMetricStreams
+    Properties:
+      RoleName: !Sub 'NewRelicMetricStreamRole-${Environment}-${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: streams.metrics.cloudwatch.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/CloudWatchMetricStreamsRole
+
+  NewRelicFirehoseRole:
+    Type: AWS::IAM::Role
+    Condition: EnableMetricStreams
+    Properties:
+      RoleName: !Sub 'NewRelicFirehoseRole-${Environment}-${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: firehose.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: NewRelicFirehosePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource: !Sub '${NewRelicBackupBucket}*'
+              - Effect: Allow
+                Action:
+                  - s3:AbortMultipartUpload
+                  - s3:GetBucketLocation  
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - s3:ListBucketMultipartUploads
+                  - s3:PutObject
+                Resource: !Sub '${NewRelicBackupBucket}*'
+
+  NewRelicBackupBucket:
+    Type: AWS::S3::Bucket
+    Condition: EnableMetricStreams
+    Properties:
+      BucketName: !Sub 'newrelic-backup-${Environment}-${AWS::AccountId}-${AWS::Region}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldBackups
+            Status: Enabled
+            ExpirationInDays: 7
+
+  NewRelicFirehoseDeliveryStream:
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Condition: EnableMetricStreams
+    Properties:
+      DeliveryStreamName: !Sub 'NewRelic-MetricStream-${Environment}'
+      DeliveryStreamType: DirectPut
+      HttpEndpointDestinationConfiguration:
+        EndpointConfiguration:
+          Url: https://aws-api.newrelic.com/cloudwatch-metrics/v1
+        RequestConfiguration:
+          ContentEncoding: GZIP
+          CommonAttributes:
+            - AttributeName: 'apikey'
+              AttributeValue: !Ref NewRelicIngestKey
+            - AttributeName: 'account.id'
+              AttributeValue: !Ref NewRelicAccountId
+        BufferingHints:
+          SizeInMBs: 1
+          IntervalInSeconds: 60
+        RetryConfiguration:
+          DurationInSeconds: 3600
+        RoleARN: !GetAtt NewRelicFirehoseRole.Arn
+        S3Configuration:
+          RoleARN: !GetAtt NewRelicFirehoseRole.Arn
+          BucketARN: !GetAtt NewRelicBackupBucket.Arn
+          CompressionFormat: GZIP
+          BufferingHints:
+            SizeInMBs: 5
+            IntervalInSeconds: 300
+
+  NewRelicMetricStream:
+    Type: AWS::CloudWatch::MetricStream  
+    Condition: EnableMetricStreams
+    Properties:
+      Name: !Sub 'NewRelic-MetricStream-${Environment}'
+      FirehoseArn: !GetAtt NewRelicFirehoseDeliveryStream.Arn
+      RoleArn: !GetAtt NewRelicMetricStreamRole.Arn
+      OutputFormat: opentelemetry0.7
+      IncludeFilters:
+        - Namespace: AWS/ApiGateway
+        - Namespace: AWS/Lambda
+        - Namespace: AWS/DynamoDB
+        - Namespace: AWS/S3
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: EPLForecast
+
 Outputs:
   DynamoDBTable:
     Description: DynamoDB table name
@@ -323,3 +474,10 @@ Outputs:
     Value: !Sub 'https://${EPLForecastAPI}.execute-api.${AWS::Region}.amazonaws.com/${Environment}'
     Export:
       Name: !Sub '${AWS::StackName}-APIEndpoint'
+
+  NewRelicRoleArn:
+    Condition: EnableNewRelic
+    Description: New Relic Infrastructure Role ARN for API polling integration
+    Value: !GetAtt NewRelicInfrastructureRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-NewRelicRoleArn'
