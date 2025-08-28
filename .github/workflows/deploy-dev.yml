@@ -71,8 +71,22 @@ jobs:
     - name: Deploy CloudFormation stack
       run: |
         echo "Deploying CloudFormation stack..."
+        echo "Template exists: $(test -f infrastructure/step6.yaml && echo 'YES' || echo 'NO')"
+        echo "AWS CLI version: $(aws --version)"
+        echo "Current region: ${{ env.AWS_REGION }}"
+        echo "Environment: ${{ env.ENVIRONMENT }}"
+        
+        # Test AWS credentials
+        aws sts get-caller-identity
+        
+        # Check if secrets are available
+        echo "RapidAPI Key length: ${#RAPIDAPI_KEY}"
+        echo "NewRelic Account ID: ${{ secrets.NEW_RELIC_ACCOUNT_ID }}"
+        echo "NewRelic License Key length: ${#NEW_RELIC_LICENSE_KEY}"
+        echo "NewRelic Ingest Key length: ${#NEW_RELIC_INGEST_KEY}"
+        
         set +e  # Don't exit on error
-        aws cloudformation deploy \
+        timeout 600 aws cloudformation deploy \
           --template-file infrastructure/step6.yaml \
           --stack-name epl-forecast-${{ env.ENVIRONMENT }} \
           --parameter-overrides \
@@ -90,13 +104,20 @@ jobs:
         
         if [ $DEPLOY_EXIT_CODE -eq 0 ]; then
           echo "CloudFormation deployment completed successfully"
+        elif [ $DEPLOY_EXIT_CODE -eq 124 ]; then
+          echo "CloudFormation deployment timed out after 10 minutes"
+          exit 1
         elif [ $DEPLOY_EXIT_CODE -eq 255 ]; then
           echo "CloudFormation deployment failed"
-          aws cloudformation describe-stack-events --stack-name epl-forecast-${{ env.ENVIRONMENT }} --region ${{ env.AWS_REGION }} --max-items 5 --query 'StackEvents[?ResourceStatus==`CREATE_FAILED` || ResourceStatus==`UPDATE_FAILED`].[Timestamp,ResourceType,ResourceStatus,ResourceStatusReason]' --output table
+          aws cloudformation describe-stack-events --stack-name epl-forecast-${{ env.ENVIRONMENT }} --region ${{ env.AWS_REGION }} --max-items 10 --query 'StackEvents[*].[Timestamp,ResourceType,ResourceStatus,ResourceStatusReason]' --output table
           exit 1
         else
           echo "CloudFormation deployment completed with exit code: $DEPLOY_EXIT_CODE"
         fi
+      env:
+        RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+        NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+        NEW_RELIC_INGEST_KEY: ${{ secrets.NEW_RELIC_INGEST_KEY }}
 
   deploy-lambda:
     needs: deploy-infrastructure
