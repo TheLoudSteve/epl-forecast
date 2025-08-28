@@ -90,12 +90,7 @@
     {
       "Effect": "Allow",
       "Action": [
-        "firehose:CreateDeliveryStream",
-        "firehose:DeleteDeliveryStream",
-        "firehose:DescribeDeliveryStream",
-        "firehose:UpdateDestination",
-        "firehose:TagDeliveryStream",
-        "firehose:UntagDeliveryStream"
+        "firehose:*"
       ],
       "Resource": "arn:aws:firehose:*:*:deliverystream/NewRelic-*"
     },
@@ -108,24 +103,13 @@
         "s3:ListBucket",
         "s3:PutBucketPolicy",
         "s3:DeleteBucketPolicy",
-        "s3:PutLifecycleConfiguration",
-        "s3:PutBucketPublicAccessBlock"
-      ],
-      "Resource": [
-        "arn:aws:s3:::newrelic-*",
-        "arn:aws:s3:::epl-forecast-*-deployments-*"
-      ]
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
         "s3:PutObject",
         "s3:DeleteObject",
         "s3:GetObject"
       ],
       "Resource": [
-        "arn:aws:s3:::newrelic-*/*",
-        "arn:aws:s3:::epl-forecast-*-deployments-*/*"
+        "arn:aws:s3:::newrelic-*",
+        "arn:aws:s3:::newrelic-*/*"
       ]
     }
   ]
