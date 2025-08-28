@@ -4,9 +4,23 @@ import NewRelic
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         
-        // Initialize New Relic monitoring
-        // TODO: Replace with actual New Relic application token
-        NewRelic.start(withApplicationToken: "551fdf56490f49d74c6bbafb22750520FFFFNRAL")
+        // Initialize New Relic monitoring with proper configuration
+        // Configure New Relic before starting
+        NewRelic.enableFeatures([
+            .NRFeatureFlag_DefaultInteractions,
+            .NRFeatureFlag_CrashReporting,
+            .NRFeatureFlag_HttpResponseBodyCapture,
+            .NRFeatureFlag_NetworkRequestEvents
+        ])
+        
+        // New Relic configuration - replace with your actual values
+        let newRelicAccountId = "7052187"
+        let newRelicAppToken = "AAaccb50adc4bb8233bf21a764a161017b06d22b80-NRMA"
+        
+        // Start New Relic with application token
+        NewRelic.start(withApplicationToken: newRelicAppToken)
+        
+        print("New Relic initialized successfully with Account ID: \(newRelicAccountId)")
         
         // Record app launch event
         NewRelic.recordCustomEvent("AppLaunch", attributes: [

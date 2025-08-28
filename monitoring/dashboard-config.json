@@ -1,0 +1,300 @@
+{
+  "dashboard": {
+    "name": "EPL Forecast - Production Overview",
+    "description": "Comprehensive monitoring dashboard for EPL Forecast iOS app and AWS infrastructure",
+    "permissions": "PUBLIC_READ_ONLY",
+    "pages": [
+      {
+        "name": "System Health Overview",
+        "description": "High-level health metrics across all services",
+        "widgets": [
+          {
+            "title": "System Status Summary",
+            "layout": {"column": 1, "row": 1, "width": 4, "height": 3},
+            "visualization": {"id": "viz.billboard"},
+            "rawConfiguration": {
+              "nrqlQueries": [
+                {
+                  "query": "SELECT count(*) as 'Total Lambda Invocations' FROM AwsLambdaInvocation WHERE provider='LambdaFunction' AND entityName LIKE '%epl-%prod%' SINCE 1 hour ago",
+                  "accountId": 7052187
+                },
+                {
+                  "query": "SELECT percentage(count(*), WHERE error IS NULL) as 'Lambda Success Rate %' FROM AwsLambdaInvocation WHERE provider='LambdaFunction' AND entityName LIKE '%epl-%prod%' SINCE 1 hour ago",
+                  "accountId": 7052187
+                },
+                {
+                  "query": "SELECT count(*) as 'RapidAPI Calls' FROM Metric WHERE metricName = 'Custom/RapidAPI/CallMade' SINCE 1 hour ago",
+                  "accountId": 7052187
+                },
+                {
+                  "query": "SELECT percentage(count(*), WHERE metricName = 'Custom/RapidAPI/Success') as 'API Success Rate %' FROM Metric WHERE metricName LIKE 'Custom/RapidAPI/%' SINCE 1 hour ago",
+                  "accountId": 7052187
+                }
+              ],
+              "thresholds": [
+                {"alertSeverity": "CRITICAL", "value": 50},
+                {"alertSeverity": "WARNING", "value": 80}
+              ]
+            }
+          },
+          {
+            "title": "Lambda Function Performance",
+            "layout": {"column": 5, "row": 1, "width": 4, "height": 3},
+            "visualization": {"id": "viz.line"},
+            "rawConfiguration": {
+              "nrqlQueries": [
+                {
+                  "query": "SELECT average(provider.duration.Maximum) as 'Avg Duration (ms)' FROM AwsLambdaInvocation WHERE provider='LambdaFunction' AND entityName LIKE '%epl-scheduled-fetcher-prod%' TIMESERIES AUTO SINCE 6 hours ago",
+                  "accountId": 7052187
+                },
+                {
+                  "query": "SELECT average(provider.duration.Maximum) as 'Live Fetcher Duration (ms)' FROM AwsLambdaInvocation WHERE provider='LambdaFunction' AND entityName LIKE '%epl-live-match-fetcher-prod%' TIMESERIES AUTO SINCE 6 hours ago",
+                  "accountId": 7052187
+                }
+              ]
+            }
+          },
+          {
+            "title": "RapidAPI Usage & Performance",
+            "layout": {"column": 9, "row": 1, "width": 4, "height": 3},
+            "visualization": {"id": "viz.area"},
+            "rawConfiguration": {
+              "nrqlQueries": [
+                {
+                  "query": "SELECT count(*) as 'API Calls' FROM Metric WHERE metricName = 'Custom/RapidAPI/CallMade' TIMESERIES AUTO SINCE 24 hours ago",
+                  "accountId": 7052187
+                },
+                {
+                  "query": "SELECT count(*) as 'API Errors' FROM Metric WHERE metricName = 'Custom/RapidAPI/Error' TIMESERIES AUTO SINCE 24 hours ago",
+                  "accountId": 7052187
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "name": "AWS Infrastructure",
+        "description": "Detailed AWS service metrics",
+        "widgets": [
+          {
+            "title": "Lambda Invocation Trends",
+            "layout": {"column": 1, "row": 1, "width": 6, "height": 4},
+            "visualization": {"id": "viz.line"},
+            "rawConfiguration": {
+              "nrqlQueries": [
+                {
+                  "query": "SELECT count(*) as 'Scheduled Fetcher' FROM AwsLambdaInvocation WHERE provider='LambdaFunction' AND entityName LIKE '%epl-scheduled-fetcher-prod%' TIMESERIES AUTO SINCE 24 hours ago",
+                  "accountId": 7052187
+                },
+                {
+                  "query": "SELECT count(*) as 'Live Match Fetcher' FROM AwsLambdaInvocation WHERE provider='LambdaFunction' AND entityName LIKE '%epl-live-match-fetcher-prod%' TIMESERIES AUTO SINCE 24 hours ago",
+                  "accountId": 7052187
+                },
+                {
+                  "query": "SELECT count(*) as 'API Handler' FROM AwsLambdaInvocation WHERE provider='LambdaFunction' AND entityName LIKE '%epl-api-handler-prod%' TIMESERIES AUTO SINCE 24 hours ago",
+                  "accountId": 7052187
+                }
+              ]
+            }
+          },
+          {
+            "title": "Lambda Error Analysis",
+            "layout": {"column": 7, "row": 1, "width": 6, "height": 4},
+            "visualization": {"id": "viz.table"},
+            "rawConfiguration": {
+              "nrqlQueries": [
+                {
+                  "query": "SELECT count(*) as 'Error Count', latest(error) as 'Latest Error' FROM AwsLambdaInvocation WHERE provider='LambdaFunction' AND entityName LIKE '%epl-%prod%' AND error IS NOT NULL FACET entityName SINCE 24 hours ago",
+                  "accountId": 7052187
+                }
+              ]
+            }
+          },
+          {
+            "title": "API Gateway Performance",
+            "layout": {"column": 1, "row": 5, "width": 6, "height": 3},
+            "visualization": {"id": "viz.line"},
+            "rawConfiguration": {
+              "nrqlQueries": [
+                {
+                  "query": "SELECT count(*) as 'Total Requests' FROM AwsApiGatewayExecution WHERE provider='ApiGateway' TIMESERIES AUTO SINCE 6 hours ago",
+                  "accountId": 7052187
+                },
+                {
+                  "query": "SELECT count(*) as '4XX Errors' FROM AwsApiGatewayExecution WHERE provider='ApiGateway' AND httpResponseCode LIKE '4%' TIMESERIES AUTO SINCE 6 hours ago",
+                  "accountId": 7052187
+                },
+                {
+                  "query": "SELECT count(*) as '5XX Errors' FROM AwsApiGatewayExecution WHERE provider='ApiGateway' AND httpResponseCode LIKE '5%' TIMESERIES AUTO SINCE 6 hours ago",
+                  "accountId": 7052187
+                }
+              ]
+            }
+          },
+          {
+            "title": "S3 Data Storage Metrics",
+            "layout": {"column": 7, "row": 5, "width": 6, "height": 3},
+            "visualization": {"id": "viz.billboard"},
+            "rawConfiguration": {
+              "nrqlQueries": [
+                {
+                  "query": "SELECT latest(provider.bucketSizeBytes.Maximum) as 'Bucket Size (Bytes)' FROM AwsS3Bucket WHERE provider='S3Bucket' AND entityName LIKE '%epl-forecast%' SINCE 1 hour ago",
+                  "accountId": 7052187
+                },
+                {
+                  "query": "SELECT sum(provider.numberOfObjects.Maximum) as 'Total Objects' FROM AwsS3Bucket WHERE provider='S3Bucket' AND entityName LIKE '%epl-forecast%' SINCE 1 hour ago",
+                  "accountId": 7052187
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "name": "Custom Metrics & Business Logic",
+        "description": "RapidAPI usage and EPL-specific metrics",
+        "widgets": [
+          {
+            "title": "RapidAPI Daily Usage",
+            "layout": {"column": 1, "row": 1, "width": 8, "height": 4},
+            "visualization": {"id": "viz.area"},
+            "rawConfiguration": {
+              "nrqlQueries": [
+                {
+                  "query": "SELECT count(*) as 'Total Calls' FROM Metric WHERE metricName = 'Custom/RapidAPI/CallMade' TIMESERIES 1 hour SINCE 7 days ago",
+                  "accountId": 7052187
+                },
+                {
+                  "query": "SELECT count(*) as 'Successful Calls' FROM Metric WHERE metricName = 'Custom/RapidAPI/Success' TIMESERIES 1 hour SINCE 7 days ago",
+                  "accountId": 7052187
+                },
+                {
+                  "query": "SELECT count(*) as 'Failed Calls' FROM Metric WHERE metricName = 'Custom/RapidAPI/Error' TIMESERIES 1 hour SINCE 7 days ago",
+                  "accountId": 7052187
+                }
+              ]
+            }
+          },
+          {
+            "title": "API Response Times",
+            "layout": {"column": 9, "row": 1, "width": 4, "height": 4},
+            "visualization": {"id": "viz.histogram"},
+            "rawConfiguration": {
+              "nrqlQueries": [
+                {
+                  "query": "SELECT histogram(metricValue) FROM Metric WHERE metricName = 'Custom/RapidAPI/ResponseTime' SINCE 24 hours ago",
+                  "accountId": 7052187
+                }
+              ]
+            }
+          },
+          {
+            "title": "EPL Match Data Freshness",
+            "layout": {"column": 1, "row": 5, "width": 6, "height": 3},
+            "visualization": {"id": "viz.table"},
+            "rawConfiguration": {
+              "nrqlQueries": [
+                {
+                  "query": "SELECT latest(timestamp) as 'Last Update', count(*) as 'Updates Today' FROM Log WHERE message LIKE '%Successfully fetched EPL data%' FACET `aws.lambda.arn` SINCE 1 day ago",
+                  "accountId": 7052187
+                }
+              ]
+            }
+          },
+          {
+            "title": "Live Match Detection",
+            "layout": {"column": 7, "row": 5, "width": 6, "height": 3},
+            "visualization": {"id": "viz.line"},
+            "rawConfiguration": {
+              "nrqlQueries": [
+                {
+                  "query": "SELECT count(*) as 'Live Matches Detected' FROM Log WHERE message LIKE '%Live match detected%' TIMESERIES AUTO SINCE 24 hours ago",
+                  "accountId": 7052187
+                },
+                {
+                  "query": "SELECT count(*) as 'Match Window Active' FROM Log WHERE message LIKE '%Match window active%' TIMESERIES AUTO SINCE 24 hours ago",
+                  "accountId": 7052187
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "name": "Mobile App Analytics",
+        "description": "iOS application performance and usage metrics",
+        "widgets": [
+          {
+            "title": "App Launch & Usage",
+            "layout": {"column": 1, "row": 1, "width": 6, "height": 4},
+            "visualization": {"id": "viz.line"},
+            "rawConfiguration": {
+              "nrqlQueries": [
+                {
+                  "query": "SELECT count(*) as 'App Launches' FROM MobileSession WHERE appName = 'EPL Forecast' TIMESERIES AUTO SINCE 7 days ago",
+                  "accountId": 7052187
+                },
+                {
+                  "query": "SELECT count(*) as 'Foreground Events' FROM Mobile WHERE eventType = 'Mobile' AND name = 'AppForeground' TIMESERIES AUTO SINCE 7 days ago",
+                  "accountId": 7052187
+                }
+              ]
+            }
+          },
+          {
+            "title": "App Crashes & Errors",
+            "layout": {"column": 7, "row": 1, "width": 6, "height": 4},
+            "visualization": {"id": "viz.billboard"},
+            "rawConfiguration": {
+              "nrqlQueries": [
+                {
+                  "query": "SELECT count(*) as 'Total Crashes' FROM MobileCrash WHERE appName = 'EPL Forecast' SINCE 7 days ago",
+                  "accountId": 7052187
+                },
+                {
+                  "query": "SELECT percentage(uniqueCount(sessionId), WHERE category != 'Crash') as 'Crash-Free Sessions %' FROM MobileSession WHERE appName = 'EPL Forecast' SINCE 7 days ago",
+                  "accountId": 7052187
+                },
+                {
+                  "query": "SELECT count(*) as 'Network Errors' FROM MobileRequestError WHERE appName = 'EPL Forecast' SINCE 7 days ago",
+                  "accountId": 7052187
+                }
+              ]
+            }
+          },
+          {
+            "title": "App Performance",
+            "layout": {"column": 1, "row": 5, "width": 8, "height": 3},
+            "visualization": {"id": "viz.line"},
+            "rawConfiguration": {
+              "nrqlQueries": [
+                {
+                  "query": "SELECT average(appLaunchTimeInSec) as 'Average Launch Time (sec)' FROM MobileSession WHERE appName = 'EPL Forecast' TIMESERIES AUTO SINCE 7 days ago",
+                  "accountId": 7052187
+                },
+                {
+                  "query": "SELECT average(memUsageMb) as 'Average Memory Usage (MB)' FROM MobileSession WHERE appName = 'EPL Forecast' TIMESERIES AUTO SINCE 7 days ago",
+                  "accountId": 7052187
+                }
+              ]
+            }
+          },
+          {
+            "title": "Device & OS Distribution",
+            "layout": {"column": 9, "row": 5, "width": 4, "height": 3},
+            "visualization": {"id": "viz.pie"},
+            "rawConfiguration": {
+              "nrqlQueries": [
+                {
+                  "query": "SELECT count(*) FROM MobileSession WHERE appName = 'EPL Forecast' FACET deviceModel SINCE 7 days ago",
+                  "accountId": 7052187
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

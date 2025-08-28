@@ -1,0 +1,127 @@
+{
+  "alert_policies": [
+    {
+      "name": "EPL Forecast - Critical Production Alerts",
+      "incident_preference": "PER_POLICY",
+      "conditions": [
+        {
+          "name": "Lambda Function Errors",
+          "type": "NRQL",
+          "query": "SELECT count(*) FROM AwsLambdaInvocation WHERE provider='LambdaFunction' AND entityName LIKE '%epl-%prod%' AND error IS NOT NULL",
+          "critical_threshold": {
+            "value": 5,
+            "time_function": "all",
+            "duration_minutes": 5
+          },
+          "warning_threshold": {
+            "value": 3,
+            "time_function": "all", 
+            "duration_minutes": 5
+          }
+        },
+        {
+          "name": "RapidAPI Failures",
+          "type": "NRQL",
+          "query": "SELECT count(*) FROM Metric WHERE metricName = 'Custom/RapidAPI/Error'",
+          "critical_threshold": {
+            "value": 3,
+            "time_function": "all",
+            "duration_minutes": 10
+          }
+        },
+        {
+          "name": "High Lambda Duration",
+          "type": "NRQL", 
+          "query": "SELECT average(provider.duration.Maximum) FROM AwsLambdaInvocation WHERE provider='LambdaFunction' AND entityName LIKE '%epl-%prod%'",
+          "critical_threshold": {
+            "value": 25000,
+            "time_function": "all",
+            "duration_minutes": 10
+          },
+          "warning_threshold": {
+            "value": 15000,
+            "time_function": "all",
+            "duration_minutes": 5
+          }
+        },
+        {
+          "name": "iOS App Crashes",
+          "type": "mobile_crash_rate",
+          "app_name": "EPL Forecast",
+          "critical_threshold": {
+            "value": 5,
+            "time_function": "all",
+            "duration_minutes": 15
+          },
+          "warning_threshold": {
+            "value": 2,
+            "time_function": "all",
+            "duration_minutes": 10
+          }
+        }
+      ]
+    },
+    {
+      "name": "EPL Forecast - Performance Monitoring", 
+      "incident_preference": "PER_CONDITION",
+      "conditions": [
+        {
+          "name": "Scheduled Fetcher Success Rate",
+          "type": "NRQL",
+          "query": "SELECT percentage(count(*), WHERE `Custom/RapidAPI/Success` = 1) FROM Metric WHERE metricName LIKE 'Custom/RapidAPI/%'",
+          "critical_threshold": {
+            "value": 80,
+            "time_function": "all",
+            "duration_minutes": 30,
+            "operator": "below"
+          },
+          "warning_threshold": {
+            "value": 90,
+            "time_function": "all", 
+            "duration_minutes": 15,
+            "operator": "below"
+          }
+        },
+        {
+          "name": "API Gateway 5XX Errors",
+          "type": "NRQL",
+          "query": "SELECT count(*) FROM AwsApiGatewayExecution WHERE provider='ApiGateway' AND httpResponseCode LIKE '5%'",
+          "critical_threshold": {
+            "value": 10,
+            "time_function": "all",
+            "duration_minutes": 10
+          },
+          "warning_threshold": {
+            "value": 5,
+            "time_function": "all",
+            "duration_minutes": 5
+          }
+        },
+        {
+          "name": "iOS App Load Time",
+          "type": "mobile_app_load_time",
+          "app_name": "EPL Forecast",
+          "critical_threshold": {
+            "value": 8,
+            "time_function": "all",
+            "duration_minutes": 10
+          },
+          "warning_threshold": {
+            "value": 5,
+            "time_function": "all",
+            "duration_minutes": 5
+          }
+        }
+      ]
+    }
+  ],
+  "notification_channels": [
+    {
+      "name": "EPL Forecast Email Alerts",
+      "type": "email",
+      "configuration": {
+        "recipients": ["your-email@domain.com"]
+      }
+    }
+  ]
+}
