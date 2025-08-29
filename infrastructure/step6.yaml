@@ -108,6 +108,10 @@ Resources:
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 300
       MemorySize: 512
+      Layers: !If 
+        - EnableNewRelic
+        - - !Sub 'arn:aws:lambda:${AWS::Region}:451483290750:layer:NewRelicPython311:2'
+        - !Ref 'AWS::NoValue'
       Code:
         ZipFile: |
           import json
@@ -134,6 +138,10 @@ Resources:
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 300
       MemorySize: 512
+      Layers: !If 
+        - EnableNewRelic
+        - - !Sub 'arn:aws:lambda:${AWS::Region}:451483290750:layer:NewRelicPython311:2'
+        - !Ref 'AWS::NoValue'
       Code:
         ZipFile: |
           import json
@@ -160,6 +168,10 @@ Resources:
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 30
       MemorySize: 256
+      Layers: !If 
+        - EnableNewRelic
+        - - !Sub 'arn:aws:lambda:${AWS::Region}:451483290750:layer:NewRelicPython311:2'
+        - !Ref 'AWS::NoValue'
       Code:
         ZipFile: |
           import json
