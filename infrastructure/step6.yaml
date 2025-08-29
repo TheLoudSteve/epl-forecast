@@ -126,6 +126,7 @@ Resources:
           NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
           NEW_RELIC_LAMBDA_HANDLER: !If [EnableNewRelic, 'scheduled_data_fetcher.lambda_handler', !Ref 'AWS::NoValue']
           NEW_RELIC_LAMBDA_EXTENSION_ENABLED: !If [EnableNewRelic, 'true', !Ref 'AWS::NoValue']
+          NEW_RELIC_SERVERLESS_MODE_ENABLED: !If [EnableNewRelic, 'true', !Ref 'AWS::NoValue']
           NEW_RELIC_APP_NAME: !If [EnableNewRelic, !Sub 'EPL-Forecast-ScheduledFetcher-${Environment}', !Ref 'AWS::NoValue']
 
   # Live match fetcher Lambda function (every 2 minutes in prod only)
@@ -158,6 +159,7 @@ Resources:
           NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
           NEW_RELIC_LAMBDA_HANDLER: !If [EnableNewRelic, 'live_match_fetcher.lambda_handler', !Ref 'AWS::NoValue']
           NEW_RELIC_LAMBDA_EXTENSION_ENABLED: !If [EnableNewRelic, 'true', !Ref 'AWS::NoValue']
+          NEW_RELIC_SERVERLESS_MODE_ENABLED: !If [EnableNewRelic, 'true', !Ref 'AWS::NoValue']
           NEW_RELIC_APP_NAME: !If [EnableNewRelic, !Sub 'EPL-Forecast-LiveFetcher-${Environment}', !Ref 'AWS::NoValue']
 
   # API handler Lambda function
@@ -187,6 +189,7 @@ Resources:
           NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
           NEW_RELIC_LAMBDA_HANDLER: !If [EnableNewRelic, 'api_handler.lambda_handler', !Ref 'AWS::NoValue']
           NEW_RELIC_LAMBDA_EXTENSION_ENABLED: !If [EnableNewRelic, 'true', !Ref 'AWS::NoValue']
+          NEW_RELIC_SERVERLESS_MODE_ENABLED: !If [EnableNewRelic, 'true', !Ref 'AWS::NoValue']
           NEW_RELIC_APP_NAME: !If [EnableNewRelic, !Sub 'EPL-Forecast-APIHandler-${Environment}', !Ref 'AWS::NoValue']
 
   # API Gateway
