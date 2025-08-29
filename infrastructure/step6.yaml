@@ -112,6 +112,13 @@ Resources:
         - EnableNewRelic
         - - !Sub 'arn:aws:lambda:${AWS::Region}:451483290750:layer:NewRelicPython311:2'
         - !Ref 'AWS::NoValue'
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 300
+      MemorySize: 512
+      Layers: !If 
+        - EnableNewRelic
+        - - !Sub 'arn:aws:lambda:${AWS::Region}:451483290750:layer:NewRelicPython311:2'
+        - !Ref 'AWS::NoValue'
       Code:
         ZipFile: |
           import json
@@ -126,8 +133,6 @@ Resources:
           NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
           NEW_RELIC_LAMBDA_HANDLER: !If [EnableNewRelic, 'scheduled_data_fetcher.lambda_handler', !Ref 'AWS::NoValue']
           NEW_RELIC_LAMBDA_EXTENSION_ENABLED: !If [EnableNewRelic, 'true', !Ref 'AWS::NoValue']
-          NEW_RELIC_SERVERLESS_MODE_ENABLED: !If [EnableNewRelic, 'true', !Ref 'AWS::NoValue']
-          NEW_RELIC_APP_NAME: !If [EnableNewRelic, !Sub 'EPL-Forecast-ScheduledFetcher-${Environment}', !Ref 'AWS::NoValue']
 
   # Live match fetcher Lambda function (every 2 minutes in prod only)
   LiveMatchFetcherFunction:
@@ -137,6 +142,13 @@ Resources:
       FunctionName: !Sub 'epl-live-fetcher-${Environment}'
       Runtime: python3.11
       Handler: !If [EnableNewRelic, 'newrelic_lambda_wrapper.handler', 'live_match_fetcher.lambda_handler']
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 300
+      MemorySize: 512
+      Layers: !If 
+        - EnableNewRelic
+        - - !Sub 'arn:aws:lambda:${AWS::Region}:451483290750:layer:NewRelicPython311:2'
+        - !Ref 'AWS::NoValue'
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 300
       MemorySize: 512
@@ -159,8 +171,6 @@ Resources:
           NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
           NEW_RELIC_LAMBDA_HANDLER: !If [EnableNewRelic, 'live_match_fetcher.lambda_handler', !Ref 'AWS::NoValue']
           NEW_RELIC_LAMBDA_EXTENSION_ENABLED: !If [EnableNewRelic, 'true', !Ref 'AWS::NoValue']
-          NEW_RELIC_SERVERLESS_MODE_ENABLED: !If [EnableNewRelic, 'true', !Ref 'AWS::NoValue']
-          NEW_RELIC_APP_NAME: !If [EnableNewRelic, !Sub 'EPL-Forecast-LiveFetcher-${Environment}', !Ref 'AWS::NoValue']
 
   # API handler Lambda function
   APIHandlerFunction:
@@ -168,10 +178,14 @@ Resources:
     Properties:
       FunctionName: !Sub 'epl-api-handler-${Environment}'
       Runtime: python3.11
-      Handler: api_handler.lambda_handler
+      Handler: !If [EnableNewRelic, 'newrelic_lambda_wrapper.handler', 'api_handler.lambda_handler']
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 30
       MemorySize: 256
+      Layers: !If 
+        - EnableNewRelic
+        - - !Sub 'arn:aws:lambda:${AWS::Region}:451483290750:layer:NewRelicPython311:2'
+        - !Ref 'AWS::NoValue'
       Code:
         ZipFile: |
           import json
@@ -185,8 +199,6 @@ Resources:
           NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
           NEW_RELIC_LAMBDA_HANDLER: !If [EnableNewRelic, 'api_handler.lambda_handler', !Ref 'AWS::NoValue']
           NEW_RELIC_LAMBDA_EXTENSION_ENABLED: !If [EnableNewRelic, 'true', !Ref 'AWS::NoValue']
-          NEW_RELIC_SERVERLESS_MODE_ENABLED: !If [EnableNewRelic, 'true', !Ref 'AWS::NoValue']
-          NEW_RELIC_APP_NAME: !If [EnableNewRelic, !Sub 'EPL-Forecast-APIHandler-${Environment}', !Ref 'AWS::NoValue']
 
   # API Gateway
   EPLForecastAPI:
