@@ -19,16 +19,10 @@ Parameters:
     NoEcho: true
     Description: New Relic license key for Lambda monitoring
     Default: ""
-  NewRelicIngestKey:
-    Type: String
-    NoEcho: true
-    Description: New Relic ingest license key for CloudWatch Metric Streams
-    Default: ""
 
 Conditions:
   IsProduction: !Equals [!Ref Environment, 'prod']
   EnableNewRelic: !Not [!Equals [!Ref NewRelicAccountId, ""]]
-  EnableMetricStreams: !Not [!Equals [!Ref NewRelicIngestKey, ""]]
   
 Resources:
   # DynamoDB table for caching EPL data
@@ -316,126 +310,6 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt LiveMatchFetcherRule.Arn
-
-  # New Relic CloudWatch Metric Streams Integration
-  NewRelicMetricStreamRole:
-    Type: AWS::IAM::Role
-    Condition: EnableMetricStreams
-    Properties:
-      RoleName: !Sub 'NewRelicMetricStreamRole-${Environment}-${AWS::Region}'
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: streams.metrics.cloudwatch.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: CloudWatchMetricStreamsPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - firehose:PutRecord
-                  - firehose:PutRecordBatch
-                Resource: !GetAtt NewRelicFirehoseDeliveryStream.Arn
-
-  NewRelicFirehoseRole:
-    Type: AWS::IAM::Role
-    Condition: EnableMetricStreams
-    Properties:
-      RoleName: !Sub 'NewRelicFirehoseRole-${Environment}-${AWS::Region}'
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: firehose.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: NewRelicFirehosePolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:GetBucketLocation
-                  - s3:ListBucket
-                Resource: !GetAtt NewRelicBackupBucket.Arn
-              - Effect: Allow
-                Action:
-                  - s3:AbortMultipartUpload
-                  - s3:GetObject
-                  - s3:ListBucketMultipartUploads
-                  - s3:PutObject
-                Resource: !Sub '${NewRelicBackupBucket.Arn}/*'
-
-  NewRelicBackupBucket:
-    Type: AWS::S3::Bucket
-    Condition: EnableMetricStreams
-    Properties:
-      BucketName: !Sub 'newrelic-backup-${Environment}-${AWS::AccountId}-${AWS::Region}'
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
-      LifecycleConfiguration:
-        Rules:
-          - Id: DeleteOldBackups
-            Status: Enabled
-            ExpirationInDays: 7
-
-  NewRelicFirehoseDeliveryStream:
-    Type: AWS::KinesisFirehose::DeliveryStream
-    Condition: EnableMetricStreams
-    Properties:
-      DeliveryStreamName: !Sub 'NewRelic-MetricStream-${Environment}'
-      DeliveryStreamType: DirectPut
-      HttpEndpointDestinationConfiguration:
-        EndpointConfiguration:
-          Url: https://aws-api.newrelic.com/cloudwatch-metrics/v1
-        RequestConfiguration:
-          ContentEncoding: GZIP
-          CommonAttributes:
-            - AttributeName: 'apikey'
-              AttributeValue: !Ref NewRelicIngestKey
-            - AttributeName: 'account.id'
-              AttributeValue: !Ref NewRelicAccountId
-        BufferingHints:
-          SizeInMBs: 1
-          IntervalInSeconds: 60
-        RoleARN: !GetAtt NewRelicFirehoseRole.Arn
-        ProcessingConfiguration:
-          Enabled: false
-        S3BackupMode: FailedDataOnly
-        S3Configuration:
-          RoleARN: !GetAtt NewRelicFirehoseRole.Arn
-          BucketARN: !GetAtt NewRelicBackupBucket.Arn
-          CompressionFormat: GZIP
-          BufferingHints:
-            SizeInMBs: 5
-            IntervalInSeconds: 300
-
-  NewRelicMetricStream:
-    Type: AWS::CloudWatch::MetricStream  
-    Condition: EnableMetricStreams
-    Properties:
-      Name: 'NR-AWS-MetricStreams'
-      FirehoseArn: !GetAtt NewRelicFirehoseDeliveryStream.Arn
-      RoleArn: !GetAtt NewRelicMetricStreamRole.Arn
-      OutputFormat: opentelemetry0.7
-      IncludeFilters:
-        - Namespace: AWS/ApiGateway
-        - Namespace: AWS/Lambda
-        - Namespace: AWS/DynamoDB
-        - Namespace: AWS/S3
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Service
-          Value: EPLForecast
 
 Outputs:
   DynamoDBTable:
