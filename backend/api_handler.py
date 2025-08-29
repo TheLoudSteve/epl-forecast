@@ -31,6 +31,10 @@ def lambda_handler(event, context):
     """
     Lambda function to handle API requests
     """
+    print("=== LAMBDA HANDLER CALLED ===")
+    print(f"Event keys: {list(event.keys()) if event else 'None'}")
+    print(f"Context: {type(context)}")
+    
     try:
         path = event.get('path', '')
         http_method = event.get('httpMethod', '')
