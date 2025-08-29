@@ -8,14 +8,30 @@ from decimal import Decimal
 # New Relic monitoring
 try:
     import newrelic.agent
+    print(f"New Relic version: {newrelic.version}")
     # Initialize if environment variables are set
     if os.environ.get('NEW_RELIC_LICENSE_KEY'):
+        license_key = os.environ.get('NEW_RELIC_LICENSE_KEY', 'Not Set')
+        app_name = os.environ.get('NEW_RELIC_APP_NAME', 'Not Set')
+        account_id = os.environ.get('NEW_RELIC_ACCOUNT_ID', 'Not Set')
+        print(f"New Relic License Key (first 8): {license_key[:8]}")
+        print(f"New Relic App Name: {app_name}")
+        print(f"New Relic Account ID: {account_id}")
+        
         newrelic.agent.initialize()
+        print("New Relic agent initialized successfully")
         NEW_RELIC_ENABLED = True
     else:
+        print("New Relic license key not found")
         NEW_RELIC_ENABLED = False
-except ImportError:
+except ImportError as e:
+    print(f"New Relic import failed: {e}")
     NEW_RELIC_ENABLED = False
+except Exception as e:
+    print(f"New Relic initialization failed: {e}")
+    NEW_RELIC_ENABLED = False
+
+print(f"New Relic enabled: {NEW_RELIC_ENABLED}")
 
 # Use the region from environment or default to us-east-1 for backward compatibility  
 region = os.environ.get('AWS_REGION', 'us-east-1')
@@ -32,6 +48,9 @@ def lambda_handler(event, context):
     """
     Lambda function to handle API requests
     """
+    if NEW_RELIC_ENABLED:
+        print("New Relic transaction starting...")
+        
     try:
         path = event.get('path', '')
         http_method = event.get('httpMethod', '')
