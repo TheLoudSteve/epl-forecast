@@ -44,6 +44,13 @@
     {
       "Effect": "Allow",
       "Action": [
+        "lambda:GetLayerVersion"
+      ],
+      "Resource": "arn:aws:lambda:*:451483290750:layer:NewRelicPython311:*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
         "dynamodb:*"
       ],
       "Resource": "arn:aws:dynamodb:*:*:table/epl-*"
