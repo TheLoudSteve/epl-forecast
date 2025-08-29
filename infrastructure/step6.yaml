@@ -168,14 +168,10 @@ Resources:
     Properties:
       FunctionName: !Sub 'epl-api-handler-${Environment}'
       Runtime: python3.11
-      Handler: !If [EnableNewRelic, 'newrelic_lambda_wrapper.handler', 'api_handler.lambda_handler']
+      Handler: api_handler.lambda_handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 30
       MemorySize: 256
-      Layers: !If 
-        - EnableNewRelic
-        - - !Sub 'arn:aws:lambda:${AWS::Region}:451483290750:layer:NewRelicPython311:2'
-        - !Ref 'AWS::NoValue'
       Code:
         ZipFile: |
           import json

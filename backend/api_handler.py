@@ -8,9 +8,12 @@ from decimal import Decimal
 # New Relic monitoring
 try:
     import newrelic.agent
-    # Initialize if environment variables are set
+    # Initialize with explicit app name if environment variables are set
     if os.environ.get('NEW_RELIC_LICENSE_KEY'):
         newrelic.agent.initialize()
+        # Set application name
+        app_name = os.environ.get('NEW_RELIC_APP_NAME', 'EPL-Forecast-APIHandler')
+        newrelic.agent.set_application_name(app_name)
         NEW_RELIC_ENABLED = True
     else:
         NEW_RELIC_ENABLED = False
@@ -27,6 +30,7 @@ class DecimalEncoder(json.JSONEncoder):
             return float(obj)
         return super(DecimalEncoder, self).default(obj)
 
+@newrelic.agent.lambda_handler() if NEW_RELIC_ENABLED else lambda x: x
 def lambda_handler(event, context):
     """
     Lambda function to handle API requests
