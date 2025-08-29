@@ -104,7 +104,7 @@ Resources:
     Properties:
       FunctionName: !Sub 'epl-scheduled-fetcher-${Environment}'
       Runtime: python3.11
-      Handler: scheduled_data_fetcher.lambda_handler
+      Handler: !If [EnableNewRelic, 'newrelic_lambda_wrapper.handler', 'scheduled_data_fetcher.lambda_handler']
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 300
       MemorySize: 512
@@ -134,7 +134,7 @@ Resources:
     Properties:
       FunctionName: !Sub 'epl-live-fetcher-${Environment}'
       Runtime: python3.11
-      Handler: live_match_fetcher.lambda_handler
+      Handler: !If [EnableNewRelic, 'newrelic_lambda_wrapper.handler', 'live_match_fetcher.lambda_handler']
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 300
       MemorySize: 512
@@ -164,7 +164,7 @@ Resources:
     Properties:
       FunctionName: !Sub 'epl-api-handler-${Environment}'
       Runtime: python3.11
-      Handler: api_handler.lambda_handler
+      Handler: !If [EnableNewRelic, 'newrelic_lambda_wrapper.handler', 'api_handler.lambda_handler']
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 30
       MemorySize: 256
