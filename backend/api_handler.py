@@ -10,9 +10,7 @@ try:
     import newrelic.agent
     # Initialize if environment variables are set
     if os.environ.get('NEW_RELIC_LICENSE_KEY'):
-        # Initialize with app name from environment variable
-        app_name = os.environ.get('NEW_RELIC_APP_NAME', 'EPL-Forecast-APIHandler')
-        newrelic.agent.initialize(app_name=app_name)
+        newrelic.agent.initialize()
         NEW_RELIC_ENABLED = True
     else:
         NEW_RELIC_ENABLED = False
