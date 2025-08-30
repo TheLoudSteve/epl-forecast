@@ -43,6 +43,8 @@ def lambda_handler(event, context):
     Lambda function to handle API requests
     """
     print("=== LAMBDA HANDLER CALLED ===")
+    print(f"NEW_RELIC_ENABLED value: {NEW_RELIC_ENABLED}")
+    print(f"NEW_RELIC_LICENSE_KEY env var: {'SET' if os.environ.get('NEW_RELIC_LICENSE_KEY') else 'NOT SET'}")
     
     # Debug New Relic transaction capture
     if NEW_RELIC_ENABLED:
@@ -67,7 +69,7 @@ def lambda_handler(event, context):
         except Exception as e:
             print(f"Error with New Relic transaction setup: {e}")
     else:
-        print("NEW_RELIC_ENABLED is False")
+        print("NEW_RELIC_ENABLED is False - this explains why no transactions are captured!")
     print(f"Event keys: {list(event.keys()) if event else 'None'}")
     print(f"Context: {type(context)}")
     
