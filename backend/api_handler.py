@@ -27,6 +27,7 @@ class DecimalEncoder(json.JSONEncoder):
             return float(obj)
         return super(DecimalEncoder, self).default(obj)
 
+@newrelic.agent.lambda_handler() if NEW_RELIC_ENABLED else lambda x: x
 def lambda_handler(event, context):
     """
     Lambda function to handle API requests
