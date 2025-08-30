@@ -8,13 +8,23 @@ from decimal import Decimal
 # New Relic monitoring
 try:
     import newrelic.agent
+    print("New Relic agent imported successfully")
     # Initialize if environment variables are set
     if os.environ.get('NEW_RELIC_LICENSE_KEY'):
-        newrelic.agent.initialize()
+        print("NEW_RELIC_LICENSE_KEY found, initializing New Relic agent...")
+        # For Lambda, we need to initialize without config file and rely on env vars
+        newrelic.agent.initialize(config_file=None, environment='production')
         NEW_RELIC_ENABLED = True
+        print(f"New Relic agent initialized successfully for app: {os.environ.get('NEW_RELIC_APP_NAME', 'EPL-Forecast-Lambda')}")
+        print(f"New Relic Account ID: {os.environ.get('NEW_RELIC_ACCOUNT_ID', 'Not Set')}")
     else:
+        print("NEW_RELIC_LICENSE_KEY not found, New Relic disabled")
         NEW_RELIC_ENABLED = False
-except ImportError:
+except ImportError as e:
+    print(f"Failed to import New Relic agent: {e}")
+    NEW_RELIC_ENABLED = False
+except Exception as e:
+    print(f"Error initializing New Relic agent: {e}")
     NEW_RELIC_ENABLED = False
 
 # Use the region from environment or default to us-east-1 for backward compatibility  
