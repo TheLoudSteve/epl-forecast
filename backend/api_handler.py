@@ -43,6 +43,31 @@ def lambda_handler(event, context):
     Lambda function to handle API requests
     """
     print("=== LAMBDA HANDLER CALLED ===")
+    
+    # Debug New Relic transaction capture
+    if NEW_RELIC_ENABLED:
+        print("NEW_RELIC_ENABLED is True, attempting manual transaction creation...")
+        try:
+            application = newrelic.agent.application()
+            print(f"New Relic application object: {application}")
+            print(f"Application active: {application.active}")
+            
+            # Force a custom event to test connection
+            newrelic.agent.record_custom_event('APIHandlerInvocation', {
+                'path': event.get('path', 'unknown'),
+                'httpMethod': event.get('httpMethod', 'unknown'),
+                'timestamp': datetime.now(timezone.utc).isoformat()
+            })
+            print("Custom event recorded successfully")
+            
+            # Test if the decorator is being applied correctly
+            print(f"Lambda handler function name: {lambda_handler.__name__}")
+            print(f"Lambda handler function: {lambda_handler}")
+            
+        except Exception as e:
+            print(f"Error with New Relic transaction setup: {e}")
+    else:
+        print("NEW_RELIC_ENABLED is False")
     print(f"Event keys: {list(event.keys()) if event else 'None'}")
     print(f"Context: {type(context)}")
     
