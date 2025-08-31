@@ -33,17 +33,31 @@ jobs:
       run: |
         mkdir -p lambda-packages
         
-        # Package api_handler
-        cd backend
-        pip install -r requirements.txt -t .
-        zip -r ../lambda-packages/api_handler.zip api_handler.py boto3* botocore* jmespath* s3transfer* urllib3* certifi* dateutil* six* newrelic*
+        # Package api_handler with clean build directory
+        mkdir -p build/api_handler
+        cp backend/api_handler.py build/api_handler/
+        cd build/api_handler
+        pip install -r ../../backend/requirements.txt -t .
+        zip -r ../../lambda-packages/api_handler.zip .
+        cd ../..
         
-        # Package scheduled_data_fetcher
-        zip -r ../lambda-packages/scheduled_data_fetcher.zip scheduled_data_fetcher.py boto3* requests* botocore* jmespath* s3transfer* urllib3* certifi* charset_normalizer* idna* dateutil* six* newrelic*
+        # Package scheduled_data_fetcher with clean build directory
+        mkdir -p build/scheduled_data_fetcher
+        cp backend/scheduled_data_fetcher.py build/scheduled_data_fetcher/
+        cd build/scheduled_data_fetcher
+        pip install -r ../../backend/requirements.txt -t .
+        pip install requests -t .
+        zip -r ../../lambda-packages/scheduled_data_fetcher.zip .
+        cd ../..
         
-        # Package live_match_fetcher
-        zip -r ../lambda-packages/live_match_fetcher.zip live_match_fetcher.py boto3* requests* icalendar* botocore* jmespath* s3transfer* urllib3* certifi* charset_normalizer* idna* pytz* dateutil* six* newrelic*
-        cd ..
+        # Package live_match_fetcher with clean build directory
+        mkdir -p build/live_match_fetcher
+        cp backend/live_match_fetcher.py build/live_match_fetcher/
+        cd build/live_match_fetcher
+        pip install -r ../../backend/requirements.txt -t .
+        pip install requests icalendar -t .
+        zip -r ../../lambda-packages/live_match_fetcher.zip .
+        cd ../..
     
     - name: Upload Lambda packages to S3
       run: |
