@@ -3,6 +3,7 @@ import NewRelic
 
 struct TableView: View {
     @StateObject private var eplService = EPLService()
+    @ObservedObject private var userSettings = UserSettings.shared
     
     var body: some View {
         VStack {
@@ -44,14 +45,51 @@ struct TableView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
-                    ForEach(eplService.teams) { team in
-                        TeamRowView(team: team)
+                    ForEach(Array(eplService.teams.enumerated()), id: \.element.id) { index, team in
+                        VStack(spacing: 0) {
+                            TeamRowView(
+                                team: team,
+                                isFavorite: team.name == userSettings.favoriteTeam,
+                                position: index + 1
+                            )
+                            
+                            // Add divider lines for Champions League and relegation zones
+                            if index == 3 { // After 4th place (Champions League)
+                                HStack {
+                                    Rectangle()
+                                        .fill(Color.blue)
+                                        .frame(height: 2)
+                                    Text("Champions League")
+                                        .font(.caption2)
+                                        .foregroundColor(.blue)
+                                        .padding(.horizontal, 8)
+                                    Rectangle()
+                                        .fill(Color.blue)
+                                        .frame(height: 2)
+                                }
+                                .padding(.vertical, 4)
+                            } else if index == eplService.teams.count - 4 { // Before last 3 (relegation zone)
+                                HStack {
+                                    Rectangle()
+                                        .fill(Color.red)
+                                        .frame(height: 2)
+                                    Text("Relegation Zone")
+                                        .font(.caption2)
+                                        .foregroundColor(.red)
+                                        .padding(.horizontal, 8)
+                                    Rectangle()
+                                        .fill(Color.red)
+                                        .frame(height: 2)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
                     }
                 }
                 .refreshable {
                     // Track user-initiated refresh
                     NewRelic.recordCustomEvent("UserRefresh", attributes: [
-                        "timestamp": Date().timeIntervalSince1970,
+                        "refreshTime": Date().timeIntervalSince1970,
                         "teamsCount": eplService.teams.count
                     ])
                     eplService.refreshData()
@@ -61,7 +99,7 @@ struct TableView: View {
         .onAppear {
             // Track table view appearance
             NewRelic.recordCustomEvent("TableViewAppeared", attributes: [
-                "timestamp": Date().timeIntervalSince1970,
+                "appearTime": Date().timeIntervalSince1970,
                 "teamsLoaded": !eplService.teams.isEmpty
             ])
         }
@@ -70,20 +108,38 @@ struct TableView: View {
 
 struct TeamRowView: View {
     let team: Team
+    let isFavorite: Bool
+    let position: Int
     
     var body: some View {
         HStack {
+            // Position indicator with Champions League and relegation colors
+            HStack(spacing: 4) {
+                // League position indicator
+                Circle()
+                    .fill(positionIndicatorColor)
+                    .frame(width: 8, height: 8)
+                
+                // Favorite team indicator
+                if isFavorite {
+                    Image(systemName: "heart.fill")
+                        .foregroundColor(.red)
+                        .font(.caption)
+                }
+            }
+            
             Text("\(team.forecastedPosition)")
                 .font(.title3)
                 .fontWeight(.bold)
-                .foregroundColor(.primary)
+                .foregroundColor(isFavorite ? team.primaryColor : positionTextColor)
                 .frame(width: 30, alignment: .leading)
                 .accessibilityLabel("Position \(team.forecastedPosition)")
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(team.name)
                     .font(.body)
-                    .fontWeight(.medium)
+                    .fontWeight(isFavorite ? .semibold : .medium)
+                    .foregroundColor(isFavorite ? team.primaryColor : .primary)
                 
                 HStack(spacing: 8) {
                     AsyncImage(url: URL(string: teamLogoURL(for: team.name))) { image in
@@ -108,16 +164,44 @@ struct TeamRowView: View {
                 Text("\(String(format: "%.0f", team.forecastedPoints))")
                     .font(.title3)
                     .fontWeight(.bold)
-                    .foregroundColor(.primary)
+                    .foregroundColor(isFavorite ? team.primaryColor : .primary)
                 
                 Text("pts")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isFavorite ? team.backgroundColor : Color.clear)
+        )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(team.name), position \(team.forecastedPosition), forecasted \(String(format: "%.0f", team.forecastedPoints)) points, played \(team.played) games, \(String(format: "%.1f", team.pointsPerGame)) points per game")
+        .accessibilityLabel("\(team.name)\(isFavorite ? " (your team)" : ""), position \(team.forecastedPosition), forecasted \(String(format: "%.0f", team.forecastedPoints)) points, played \(team.played) games, \(String(format: "%.1f", team.pointsPerGame)) points per game")
+    }
+    
+    // Computed properties for position-based styling
+    var positionIndicatorColor: Color {
+        switch position {
+        case 1...4:
+            return .blue // Champions League
+        case 18...20:
+            return .red // Relegation
+        default:
+            return .gray // Mid-table
+        }
+    }
+    
+    var positionTextColor: Color {
+        switch position {
+        case 1...4:
+            return .blue // Champions League
+        case 18...20:
+            return .red // Relegation
+        default:
+            return .primary // Mid-table
+        }
     }
 }
 

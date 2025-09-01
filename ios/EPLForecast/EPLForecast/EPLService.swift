@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import NewRelic
+import WidgetKit
 
 class EPLService: ObservableObject {
     @Published var teams: [Team] = []
@@ -30,7 +31,7 @@ class EPLService: ObservableObject {
         // Track EPL data fetch start
         NewRelic.recordCustomEvent("EPLDataFetchStart", attributes: [
             "baseURL": baseURL,
-            "timestamp": Date().timeIntervalSince1970
+            "startTime": Date().timeIntervalSince1970
         ])
         
         guard let url = URL(string: "\(baseURL)/table") else {
@@ -125,6 +126,12 @@ class EPLService: ObservableObject {
                     let apiResponse = try JSONDecoder().decode(APIResponse.self, from: data)
                     self?.teams = apiResponse.forecastTable
                     self?.lastUpdated = self?.formatDate(apiResponse.metadata.lastUpdated)
+                    
+                    // Cache data for widget
+                    SharedDataManager.shared.cacheTeamData(apiResponse.forecastTable)
+                    
+                    // Trigger widget refresh
+                    WidgetCenter.shared.reloadAllTimelines()
                     
                     // Record successful data fetch
                     NewRelic.recordCustomEvent("EPLDataFetchSuccess", attributes: [

@@ -17,6 +17,9 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         let newRelicAccountId = "7052187"
         let newRelicAppToken = "AAaccb50adc4bb8233bf21a764a161017b06d22b80-NRMA"
         
+        // Configure New Relic with account ID for distributed tracing
+        NewRelic.setUserId("epl-forecast-ios")
+        
         // Start New Relic with application token
         NewRelic.start(withApplicationToken: newRelicAppToken)
         
@@ -38,14 +41,14 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     func applicationWillEnterForeground(_ application: UIApplication) {
         // Track app returning to foreground
         NewRelic.recordCustomEvent("AppForeground", attributes: [
-            "timestamp": Date().timeIntervalSince1970
+            "eventTime": Date().timeIntervalSince1970
         ])
     }
     
     func applicationDidEnterBackground(_ application: UIApplication) {
         // Track app going to background
         NewRelic.recordCustomEvent("AppBackground", attributes: [
-            "timestamp": Date().timeIntervalSince1970
+            "eventTime": Date().timeIntervalSince1970
         ])
     }
 }
