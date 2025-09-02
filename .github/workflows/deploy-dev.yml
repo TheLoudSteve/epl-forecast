@@ -118,7 +118,18 @@ jobs:
           
           # Wait for drift detection to complete
           echo "Waiting for drift detection to complete..."
-          aws cloudformation wait stack-drift-detection-complete --stack-drift-detection-id $DRIFT_ID
+          while true; do
+            STATUS=$(aws cloudformation describe-stack-drift-detection-status --stack-drift-detection-id $DRIFT_ID --query 'DetectionStatus' --output text 2>/dev/null || echo "FAILED")
+            if [ "$STATUS" = "DETECTION_COMPLETE" ]; then
+              break
+            elif [ "$STATUS" = "DETECTION_FAILED" ]; then
+              echo "❌ Drift detection failed"
+              exit 1
+            else
+              echo "Current status: $STATUS, waiting..."
+              sleep 5
+            fi
+          done
           
           # Get drift status
           DRIFT_STATUS=$(aws cloudformation describe-stack-drift-detection-status --stack-drift-detection-id $DRIFT_ID --query 'StackDriftStatus' --output text)
