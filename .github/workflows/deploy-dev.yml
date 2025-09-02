@@ -249,6 +249,32 @@ jobs:
         
         echo "✅ Stack update completed successfully"
 
+    - name: Deploy API Gateway changes
+      if: steps.changeset.outputs.changeset-created == 'true'
+      run: |
+        echo "Deploying API Gateway changes to ensure endpoints are available..."
+        
+        # Get the API Gateway ID from CloudFormation
+        API_ID=$(aws cloudformation describe-stack-resources \
+          --stack-name ${{ env.STACK_NAME }} \
+          --logical-resource-id EPLForecastAPI \
+          --query 'StackResources[0].PhysicalResourceId' \
+          --output text)
+        
+        if [ "$API_ID" != "None" ] && [ -n "$API_ID" ]; then
+          echo "Creating new API Gateway deployment for API: $API_ID"
+          
+          aws apigateway create-deployment \
+            --rest-api-id "$API_ID" \
+            --stage-name ${{ env.ENVIRONMENT }} \
+            --stage-description "Deployed via GitHub Actions - $(date)"
+          
+          echo "✅ API Gateway deployed successfully"
+        else
+          echo "❌ Could not find API Gateway ID"
+          exit 1
+        fi
+
   verify-deployment:
     needs: deploy-infrastructure
     runs-on: ubuntu-latest
