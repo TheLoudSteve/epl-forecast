@@ -4,6 +4,10 @@ import boto3
 from datetime import datetime, timezone
 from typing import Dict, Any
 from decimal import Decimal
+from models import UserNotificationPreferences, NotificationTiming, NotificationSensitivity, EPL_TEAMS
+from notification_logic import notification_manager
+from notification_content_generator import notification_content_generator
+from notification_rate_limiter import notification_rate_limiter
 
 # New Relic monitoring
 try:
@@ -89,6 +93,18 @@ def lambda_handler(event, context):
             return handle_table_request()
         elif path == '/debug' and http_method == 'GET':
             return handle_debug_request()
+        elif path == '/preferences' and http_method == 'GET':
+            return handle_get_preferences(event)
+        elif path == '/preferences' and http_method in ['POST', 'PUT']:
+            return handle_update_preferences(event)
+        elif path == '/preferences/register' and http_method == 'POST':
+            return handle_register_push_token(event)
+        elif path == '/preferences/test' and http_method == 'POST':
+            return handle_test_notification(event)
+        elif path == '/preferences/preview' and http_method == 'GET':
+            return handle_notification_preview(event)
+        elif path == '/preferences/stats' and http_method == 'GET':
+            return handle_notification_stats(event)
         else:
             return {
                 'statusCode': 404,
@@ -218,13 +234,406 @@ def handle_debug_request():
             }, cls=DecimalEncoder)
         }
 
+def handle_get_preferences(event: Dict[str, Any]):
+    """
+    Get user notification preferences
+    """
+    user_id = get_user_id_from_event(event)
+    if not user_id:
+        return {
+            'statusCode': 400,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'error': 'User ID required in X-User-ID header'}, cls=DecimalEncoder)
+        }
+    
+    preferences_table_name = os.environ['USER_PREFERENCES_TABLE']
+    preferences_table = dynamodb.Table(preferences_table_name)
+    
+    try:
+        response = preferences_table.get_item(Key={'user_id': user_id})
+        
+        if 'Item' in response:
+            # Convert DynamoDB item back to preferences object
+            preferences = UserNotificationPreferences.from_dynamodb_item(response['Item'])
+            return {
+                'statusCode': 200,
+                'headers': get_cors_headers(),
+                'body': json.dumps({
+                    'preferences': preferences.to_dynamodb_item(),
+                    'available_teams': EPL_TEAMS
+                }, cls=DecimalEncoder)
+            }
+        else:
+            # Return default preferences
+            default_preferences = UserNotificationPreferences(
+                user_id=user_id,
+                team_name="Arsenal"  # Default team
+            )
+            return {
+                'statusCode': 200,
+                'headers': get_cors_headers(),
+                'body': json.dumps({
+                    'preferences': default_preferences.to_dynamodb_item(),
+                    'available_teams': EPL_TEAMS,
+                    'is_default': True
+                }, cls=DecimalEncoder)
+            }
+            
+    except Exception as e:
+        print(f"Error getting preferences: {str(e)}")
+        return {
+            'statusCode': 500,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'error': 'Failed to retrieve preferences'}, cls=DecimalEncoder)
+        }
+
+def handle_update_preferences(event: Dict[str, Any]):
+    """
+    Update user notification preferences
+    """
+    user_id = get_user_id_from_event(event)
+    if not user_id:
+        return {
+            'statusCode': 400,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'error': 'User ID required in X-User-ID header'}, cls=DecimalEncoder)
+        }
+    
+    try:
+        body = json.loads(event.get('body', '{}'))
+    except json.JSONDecodeError:
+        return {
+            'statusCode': 400,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'error': 'Invalid JSON in request body'}, cls=DecimalEncoder)
+        }
+    
+    # Validate team name
+    team_name = body.get('team_name', '')
+    if team_name and team_name not in EPL_TEAMS:
+        return {
+            'statusCode': 400,
+            'headers': get_cors_headers(),
+            'body': json.dumps({
+                'error': f'Invalid team name. Must be one of: {", ".join(EPL_TEAMS)}'
+            }, cls=DecimalEncoder)
+        }
+    
+    # Validate notification timing
+    timing = body.get('notification_timing', 'immediate')
+    try:
+        notification_timing = NotificationTiming(timing)
+    except ValueError:
+        return {
+            'statusCode': 400,
+            'headers': get_cors_headers(),
+            'body': json.dumps({
+                'error': f'Invalid notification timing. Must be one of: {[t.value for t in NotificationTiming]}'
+            }, cls=DecimalEncoder)
+        }
+    
+    # Validate notification sensitivity
+    sensitivity = body.get('notification_sensitivity', 'any_change')
+    try:
+        notification_sensitivity = NotificationSensitivity(sensitivity)
+    except ValueError:
+        return {
+            'statusCode': 400,
+            'headers': get_cors_headers(),
+            'body': json.dumps({
+                'error': f'Invalid notification sensitivity. Must be one of: {[s.value for s in NotificationSensitivity]}'
+            }, cls=DecimalEncoder)
+        }
+    
+    # Create preferences object
+    preferences = UserNotificationPreferences(
+        user_id=user_id,
+        team_name=team_name,
+        enabled=body.get('enabled', True),
+        notification_timing=notification_timing,
+        notification_sensitivity=notification_sensitivity,
+        push_token=body.get('push_token'),
+        email_address=body.get('email_address'),
+        email_notifications_enabled=body.get('email_notifications_enabled', False)
+    )
+    
+    # Save to DynamoDB
+    preferences_table_name = os.environ['USER_PREFERENCES_TABLE']
+    preferences_table = dynamodb.Table(preferences_table_name)
+    
+    try:
+        preferences_table.put_item(Item=preferences.to_dynamodb_item())
+        
+        return {
+            'statusCode': 200,
+            'headers': get_cors_headers(),
+            'body': json.dumps({
+                'message': 'Preferences updated successfully',
+                'preferences': preferences.to_dynamodb_item()
+            }, cls=DecimalEncoder)
+        }
+        
+    except Exception as e:
+        print(f"Error saving preferences: {str(e)}")
+        return {
+            'statusCode': 500,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'error': 'Failed to save preferences'}, cls=DecimalEncoder)
+        }
+
+def handle_register_push_token(event: Dict[str, Any]):
+    """
+    Register or update push notification token
+    """
+    user_id = get_user_id_from_event(event)
+    if not user_id:
+        return {
+            'statusCode': 400,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'error': 'User ID required in X-User-ID header'}, cls=DecimalEncoder)
+        }
+    
+    try:
+        body = json.loads(event.get('body', '{}'))
+    except json.JSONDecodeError:
+        return {
+            'statusCode': 400,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'error': 'Invalid JSON in request body'}, cls=DecimalEncoder)
+        }
+    
+    push_token = body.get('push_token', '')
+    if not push_token:
+        return {
+            'statusCode': 400,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'error': 'push_token required in request body'}, cls=DecimalEncoder)
+        }
+    
+    preferences_table_name = os.environ['USER_PREFERENCES_TABLE']
+    preferences_table = dynamodb.Table(preferences_table_name)
+    
+    try:
+        # Get existing preferences or create default
+        response = preferences_table.get_item(Key={'user_id': user_id})
+        
+        if 'Item' in response:
+            preferences = UserNotificationPreferences.from_dynamodb_item(response['Item'])
+        else:
+            preferences = UserNotificationPreferences(
+                user_id=user_id,
+                team_name="Arsenal"  # Default team
+            )
+        
+        # Update push token
+        preferences.push_token = push_token
+        
+        # Save updated preferences
+        preferences_table.put_item(Item=preferences.to_dynamodb_item())
+        
+        return {
+            'statusCode': 200,
+            'headers': get_cors_headers(),
+            'body': json.dumps({
+                'message': 'Push token registered successfully',
+                'user_id': user_id
+            }, cls=DecimalEncoder)
+        }
+        
+    except Exception as e:
+        print(f"Error registering push token: {str(e)}")
+        return {
+            'statusCode': 500,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'error': 'Failed to register push token'}, cls=DecimalEncoder)
+        }
+
+def handle_test_notification(event: Dict[str, Any]):
+    """
+    Send a test notification to verify setup
+    """
+    user_id = get_user_id_from_event(event)
+    if not user_id:
+        return {
+            'statusCode': 400,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'error': 'User ID required in X-User-ID header'}, cls=DecimalEncoder)
+        }
+    
+    try:
+        result = notification_manager.send_test_notification(user_id)
+        
+        if 'error' in result:
+            return {
+                'statusCode': 400,
+                'headers': get_cors_headers(),
+                'body': json.dumps(result, cls=DecimalEncoder)
+            }
+        else:
+            return {
+                'statusCode': 200,
+                'headers': get_cors_headers(),
+                'body': json.dumps(result, cls=DecimalEncoder)
+            }
+            
+    except Exception as e:
+        print(f"Error sending test notification: {str(e)}")
+        return {
+            'statusCode': 500,
+            'headers': get_cors_headers(),
+            'body': json.dumps({
+                'error': 'Failed to send test notification',
+                'details': str(e)
+            }, cls=DecimalEncoder)
+        }
+
+def handle_notification_preview(event: Dict[str, Any]):
+    """
+    Get preview notifications for different scenarios
+    """
+    user_id = get_user_id_from_event(event)
+    if not user_id:
+        return {
+            'statusCode': 400,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'error': 'User ID required in X-User-ID header'}, cls=DecimalEncoder)
+        }
+    
+    preferences_table_name = os.environ['USER_PREFERENCES_TABLE']
+    preferences_table = dynamodb.Table(preferences_table_name)
+    
+    try:
+        # Get user preferences
+        response = preferences_table.get_item(Key={'user_id': user_id})
+        
+        if 'Item' in response:
+            preferences = UserNotificationPreferences.from_dynamodb_item(response['Item'])
+        else:
+            # Use default preferences for preview
+            preferences = UserNotificationPreferences(
+                user_id=user_id,
+                team_name="Arsenal"  # Default team
+            )
+        
+        # Define preview scenarios
+        scenarios = [
+            {
+                'name': 'Title Position',
+                'previous_position': 2,
+                'new_position': 1,
+                'context': 'Manchester City vs Liverpool result'
+            },
+            {
+                'name': 'Champions League Entry',
+                'previous_position': 5,
+                'new_position': 4,
+                'context': 'Tottenham vs Chelsea result'
+            },
+            {
+                'name': 'Relegation Danger',
+                'previous_position': 17,
+                'new_position': 18,
+                'context': 'Burnley vs Sheffield United result'
+            },
+            {
+                'name': 'Escaping Relegation',
+                'previous_position': 19,
+                'new_position': 17,
+                'context': 'crucial win against relegation rivals'
+            },
+            {
+                'name': 'Minor Improvement',
+                'previous_position': 8,
+                'new_position': 7,
+                'context': 'improved goal difference'
+            }
+        ]
+        
+        # Generate preview notifications
+        previews = notification_content_generator.get_notification_preview(
+            preferences, scenarios
+        )
+        
+        return {
+            'statusCode': 200,
+            'headers': get_cors_headers(),
+            'body': json.dumps({
+                'user_id': user_id,
+                'team_name': preferences.team_name,
+                'notification_settings': {
+                    'timing': preferences.notification_timing.value,
+                    'sensitivity': preferences.notification_sensitivity.value,
+                    'enabled': preferences.enabled
+                },
+                'previews': previews
+            }, cls=DecimalEncoder)
+        }
+        
+    except Exception as e:
+        print(f"Error generating notification preview: {str(e)}")
+        return {
+            'statusCode': 500,
+            'headers': get_cors_headers(),
+            'body': json.dumps({
+                'error': 'Failed to generate notification preview',
+                'details': str(e)
+            }, cls=DecimalEncoder)
+        }
+
+def handle_notification_stats(event: Dict[str, Any]):
+    """
+    Get notification statistics and rate limiting info for a user
+    """
+    user_id = get_user_id_from_event(event)
+    if not user_id:
+        return {
+            'statusCode': 400,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'error': 'User ID required in X-User-ID header'}, cls=DecimalEncoder)
+        }
+    
+    try:
+        # Get notification statistics
+        stats = notification_rate_limiter.get_user_notification_stats(user_id)
+        
+        # Add current time for client reference
+        stats['current_time'] = int(datetime.now(timezone.utc).timestamp())
+        
+        return {
+            'statusCode': 200,
+            'headers': get_cors_headers(),
+            'body': json.dumps(stats, cls=DecimalEncoder)
+        }
+        
+    except Exception as e:
+        print(f"Error getting notification stats: {str(e)}")
+        return {
+            'statusCode': 500,
+            'headers': get_cors_headers(),
+            'body': json.dumps({
+                'error': 'Failed to get notification statistics',
+                'details': str(e)
+            }, cls=DecimalEncoder)
+        }
+
+def get_user_id_from_event(event: Dict[str, Any]) -> str:
+    """
+    Extract user ID from event headers
+    """
+    headers = event.get('headers', {})
+    # Check both X-User-ID and x-user-id (case insensitive)
+    for key, value in headers.items():
+        if key.lower() == 'x-user-id':
+            return value
+    return ''
+
 def get_cors_headers():
     """
     Get CORS headers for API responses
     """
     return {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type,X-User-ID',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
         'Content-Type': 'application/json'
     }

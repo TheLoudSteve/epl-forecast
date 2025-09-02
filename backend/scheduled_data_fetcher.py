@@ -5,17 +5,29 @@ import requests
 from datetime import datetime, timezone
 from typing import Dict, List, Any
 from decimal import Decimal
+from forecast_history import forecast_history_manager
+from notification_logic import notification_manager
 
 # New Relic monitoring
 try:
     import newrelic.agent
+    print("New Relic agent imported successfully")
     # Initialize if environment variables are set
     if os.environ.get('NEW_RELIC_LICENSE_KEY'):
-        newrelic.agent.initialize()
+        print("NEW_RELIC_LICENSE_KEY found, initializing New Relic agent...")
+        # For Lambda, we need to initialize without config file and rely on env vars
+        newrelic.agent.initialize(config_file=None, environment='production')
         NEW_RELIC_ENABLED = True
+        print(f"New Relic agent initialized successfully for app: {os.environ.get('NEW_RELIC_APP_NAME', 'EPL-Forecast-Lambda')}")
+        print(f"New Relic Account ID: {os.environ.get('NEW_RELIC_ACCOUNT_ID', 'Not Set')}")
     else:
+        print("NEW_RELIC_LICENSE_KEY not found, New Relic disabled")
         NEW_RELIC_ENABLED = False
-except ImportError:
+except ImportError as e:
+    print(f"Failed to import New Relic agent: {e}")
+    NEW_RELIC_ENABLED = False
+except Exception as e:
+    print(f"Error initializing New Relic agent: {e}")
     NEW_RELIC_ENABLED = False
 
 # Use the region from environment or default to us-east-1 for backward compatibility
@@ -57,12 +69,36 @@ def lambda_handler(event, context):
         store_data(table, forecast_data)
         print("Successfully stored data in DynamoDB")
         
+        # Save forecast snapshot to history
+        try:
+            snapshot = forecast_history_manager.save_forecast_snapshot(
+                forecast_data, 
+                context="Scheduled update"
+            )
+            print(f"Successfully saved forecast snapshot with timestamp {snapshot.timestamp}")
+        except Exception as snapshot_error:
+            print(f"Error saving forecast snapshot: {snapshot_error}")
+            # Don't fail the entire function if snapshot saving fails
+        
+        # Process notifications for position changes
+        notification_result = {'notifications_sent': 0}
+        try:
+            notification_result = notification_manager.process_forecast_update(
+                forecast_data,
+                context="Scheduled update"
+            )
+            print(f"Notification processing result: {notification_result}")
+        except Exception as notification_error:
+            print(f"Error processing notifications: {notification_error}")
+            # Don't fail the entire function if notification processing fails
+        
         return {
             'statusCode': 200,
             'body': json.dumps({
                 'message': 'Scheduled data updated successfully',
                 'timestamp': datetime.now(timezone.utc).isoformat(),
-                'teams_processed': len(forecast_data.get('teams', []))
+                'teams_processed': len(forecast_data.get('teams', [])),
+                'notifications_sent': notification_result.get('notifications_sent', 0)
             })
         }
             
@@ -95,11 +131,13 @@ def fetch_epl_data(rapidapi_key: str) -> Dict[str, Any]:
     # Record New Relic custom metric for RapidAPI call
     environment = os.environ.get('ENVIRONMENT', 'unknown')
     if NEW_RELIC_ENABLED:
+        print("Recording New Relic metrics for RapidAPI call...")
         newrelic.agent.record_custom_metric('Custom/RapidAPI/CallMade', 1)
         newrelic.agent.add_custom_attribute('rapidapi.call_reason', 'scheduled_update')
         newrelic.agent.add_custom_attribute('rapidapi.environment', environment)
         newrelic.agent.add_custom_attribute('rapidapi.url', url)
         newrelic.agent.add_custom_attribute('rapidapi.timestamp', datetime.now(timezone.utc).isoformat())
+        print("New Relic metrics recorded for RapidAPI call")
     
     start_time = datetime.now(timezone.utc)
     response = requests.get(url, headers=headers, params=querystring, timeout=30)
@@ -112,10 +150,12 @@ def fetch_epl_data(rapidapi_key: str) -> Dict[str, Any]:
     
     # Record response metrics
     if NEW_RELIC_ENABLED:
+        print(f"Recording New Relic response metrics: status={response.status_code}, time={response_time_ms:.2f}ms")
         newrelic.agent.record_custom_metric('Custom/RapidAPI/ResponseTime', response_time_ms)
         newrelic.agent.record_custom_metric(f'Custom/RapidAPI/StatusCode/{response.status_code}', 1)
         newrelic.agent.add_custom_attribute('rapidapi.response_status', response.status_code)
         newrelic.agent.add_custom_attribute('rapidapi.response_time_ms', response_time_ms)
+        print("New Relic response metrics recorded")
     
     response.raise_for_status()
     

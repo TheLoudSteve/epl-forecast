@@ -7,10 +7,7 @@ class SharedDataManager {
     private let appGroupIdentifier = "group.com.LoudSteve.EplForecast.EPLForecast"
     
     private var sharedDefaults: UserDefaults? {
-        let defaults = UserDefaults(suiteName: appGroupIdentifier)
-        print("Main App SharedDataManager - App Group ID: \(appGroupIdentifier)")
-        print("Main App SharedDataManager - SharedDefaults created: \(defaults != nil ? "success" : "failed")")
-        return defaults
+        return UserDefaults(suiteName: appGroupIdentifier)
     }
     
     private init() {}
@@ -21,54 +18,35 @@ class SharedDataManager {
         get {
             // Use file-based storage for reliable app group sharing
             guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier) else {
-                print("Main App SharedDataManager - Failed to get app group container URL")
                 return nil
             }
             
             let favoriteTeamFile = containerURL.appendingPathComponent("favoriteTeam.txt")
-            print("Main App SharedDataManager - Reading from file: \(favoriteTeamFile.path)")
             
             do {
                 let favoriteTeam = try String(contentsOf: favoriteTeamFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
-                print("Main App SharedDataManager - Read favorite team from file: \(favoriteTeam)")
                 return favoriteTeam.isEmpty ? nil : favoriteTeam
             } catch {
-                print("Main App SharedDataManager - Failed to read favorite team file: \(error)")
                 return nil
             }
         }
         set {
-            print("Main App SharedDataManager - Set favoriteTeam to: \(newValue ?? "nil")")
-            
             // Write to app group file (preferred method)
             if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier) {
                 let favoriteTeamFile = containerURL.appendingPathComponent("favoriteTeam.txt")
-                print("Main App SharedDataManager - Writing to app group file: \(favoriteTeamFile.path)")
                 
                 do {
                     if let newValue = newValue {
                         try newValue.write(to: favoriteTeamFile, atomically: true, encoding: .utf8)
-                        print("Main App SharedDataManager - Successfully wrote to file: \(newValue)")
-                        
-                        // Verify immediately
-                        let verification = try String(contentsOf: favoriteTeamFile, encoding: .utf8)
-                        print("Main App SharedDataManager - File verification read: \(verification)")
                     }
                 } catch {
-                    print("Main App SharedDataManager - Failed to write to file: \(error)")
+                    // File write failed, UserDefaults will serve as fallback
                 }
-            } else {
-                print("Main App SharedDataManager - App group container not accessible")
             }
             
             // Also write to UserDefaults (fallback for widget)
             sharedDefaults?.set(newValue, forKey: "favoriteTeam")
             sharedDefaults?.synchronize()
-            print("Main App SharedDataManager - Also wrote to UserDefaults: \(newValue ?? "nil")")
-            
-            // Verify UserDefaults write
-            let userDefaultsVerify = sharedDefaults?.string(forKey: "favoriteTeam")
-            print("Main App SharedDataManager - UserDefaults verification: \(userDefaultsVerify ?? "nil")")
         }
     }
     
@@ -100,7 +78,20 @@ class SharedDataManager {
             let decoder = JSONDecoder()
             return try decoder.decode([Team].self, from: data)
         } catch {
-            print("Failed to decode cached team data: \(error)")
+            return nil
+        }
+    }
+    
+    // Get any cached team data, regardless of age (for immediate display)
+    func getAnyCachedTeamData() -> [Team]? {
+        guard let data = sharedDefaults?.data(forKey: "cachedTeams") else {
+            return nil
+        }
+        
+        do {
+            let decoder = JSONDecoder()
+            return try decoder.decode([Team].self, from: data)
+        } catch {
             return nil
         }
     }

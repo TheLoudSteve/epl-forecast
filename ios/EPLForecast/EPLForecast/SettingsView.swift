@@ -6,6 +6,9 @@ struct SettingsView: View {
     @StateObject private var eplService = EPLService()
     @Environment(\.dismiss) private var dismiss
     @State private var showingTeamSelection = false
+    @State private var isTestingNotification = false
+    @State private var testNotificationResult: String?
+    @State private var showingTestResult = false
     
     var body: some View {
         NavigationView {
@@ -49,6 +52,40 @@ struct SettingsView: View {
                     }
                 }
                 
+                Section("Notifications") {
+                    Button(action: {
+                        isTestingNotification = true
+                        testNotificationResult = nil
+                        
+                        eplService.sendTestNotification { result in
+                            isTestingNotification = false
+                            
+                            switch result {
+                            case .success(let message):
+                                testNotificationResult = message
+                                showingTestResult = true
+                            case .failure(let error):
+                                testNotificationResult = "Failed to send test notification: \(error.localizedDescription)"
+                                showingTestResult = true
+                            }
+                        }
+                    }) {
+                        HStack {
+                            if isTestingNotification {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                    .padding(.trailing, 8)
+                            }
+                            Text(isTestingNotification ? "Sending..." : "Send Test Notification")
+                        }
+                    }
+                    .disabled(isTestingNotification)
+                    
+                    Text("Send a test notification to verify push notifications are working correctly.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
                 Section("About") {
                     HStack {
                         Text("Version")
@@ -83,6 +120,13 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingTeamSelection) {
             FavoriteTeamSelectionView(isOnboarding: false)
+        }
+        .alert("Test Notification", isPresented: $showingTestResult) {
+            Button("OK") {
+                testNotificationResult = nil
+            }
+        } message: {
+            Text(testNotificationResult ?? "")
         }
         .onAppear {
             // Track settings view appearance

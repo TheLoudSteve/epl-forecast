@@ -7,6 +7,8 @@ from typing import Dict, List, Any
 from decimal import Decimal
 import icalendar
 from dateutil import tz
+from forecast_history import forecast_history_manager
+from notification_logic import notification_manager
 
 # New Relic monitoring
 try:
@@ -88,13 +90,38 @@ def lambda_handler(event, context):
         store_data(table, forecast_data)
         print("Successfully stored live match data in DynamoDB")
         
+        # Save forecast snapshot to history
+        try:
+            context = f"Live match update - {match_context}"
+            snapshot = forecast_history_manager.save_forecast_snapshot(
+                forecast_data, 
+                context=context
+            )
+            print(f"Successfully saved live match forecast snapshot with timestamp {snapshot.timestamp}")
+        except Exception as snapshot_error:
+            print(f"Error saving live match forecast snapshot: {snapshot_error}")
+            # Don't fail the entire function if snapshot saving fails
+        
+        # Process notifications for position changes during live matches
+        notification_result = {'notifications_sent': 0}
+        try:
+            notification_result = notification_manager.process_forecast_update(
+                forecast_data,
+                context=f"after {match_context}"
+            )
+            print(f"Live match notification processing result: {notification_result}")
+        except Exception as notification_error:
+            print(f"Error processing live match notifications: {notification_error}")
+            # Don't fail the entire function if notification processing fails
+        
         return {
             'statusCode': 200,
             'body': json.dumps({
                 'message': 'Live match data updated successfully',
                 'timestamp': datetime.now(timezone.utc).isoformat(),
                 'teams_processed': len(forecast_data.get('teams', [])),
-                'match_happening': True
+                'match_happening': True,
+                'notifications_sent': notification_result.get('notifications_sent', 0)
             })
         }
             

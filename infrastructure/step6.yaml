@@ -19,10 +19,15 @@ Parameters:
     NoEcho: true
     Description: New Relic license key for Lambda monitoring
     Default: ""
+  APNSCertificateArn:
+    Type: String
+    Description: ARN of the APNS certificate uploaded to AWS Certificate Manager (optional)
+    Default: ""
 
 Conditions:
   IsProduction: !Equals [!Ref Environment, 'prod']
   EnableNewRelic: !Not [!Equals [!Ref NewRelicAccountId, ""]]
+  EnableAPNS: !Not [!Equals [!Ref APNSCertificateArn, ""]]
   
 Resources:
   # DynamoDB table for caching EPL data
@@ -37,6 +42,46 @@ Resources:
       KeySchema:
         - AttributeName: id
           KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  # DynamoDB table for user notification preferences
+  UserPreferencesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'epl-user-preferences-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  # DynamoDB table for historical forecast snapshots
+  ForecastHistoryTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'epl-forecast-history-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: snapshot_id
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: N
+      KeySchema:
+        - AttributeName: snapshot_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: TimestampIndex
+          KeySchema:
+            - AttributeName: timestamp
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
       TimeToLiveSpecification:
         AttributeName: ttl
         Enabled: true
@@ -66,6 +111,25 @@ Resources:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
         - arn:aws:iam::aws:policy/AmazonS3FullAccess
+      Policies:
+        - PolicyName: SNSPublishPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                  - sns:CreatePlatformEndpoint
+                  - sns:DeleteEndpoint
+                  - sns:GetEndpointAttributes
+                  - sns:SetEndpointAttributes
+                Resource: 
+                  - !Ref PushNotificationTopic
+                  - !If 
+                    - EnableAPNS
+                    - !Ref APNSPlatformApplication
+                    - !Ref 'AWS::NoValue'
+                  - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:endpoint/APNS/*'
 
   # IAM role for New Relic AWS integration (API polling)
   NewRelicInfrastructureRole:
@@ -98,6 +162,24 @@ Resources:
                   - tag:GetResources
                 Resource: '*'
 
+  # SNS Platform Application for APNS (iOS push notifications)
+  APNSPlatformApplication:
+    Type: AWS::SNS::PlatformApplication
+    Condition: EnableAPNS
+    Properties:
+      Name: !Sub 'EPLForecast-APNS-${Environment}'
+      Platform: APNS
+      Attributes:
+        PlatformCredential: !Ref APNSCertificateArn
+
+  # SNS Topic for push notifications
+  PushNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub 'epl-forecast-notifications-${Environment}'
+      DisplayName: 'EPL Forecast Notifications'
+
+
   # Scheduled data fetcher Lambda function (2x daily)
   ScheduledDataFetcherFunction:
     Type: AWS::Lambda::Function
@@ -124,7 +206,11 @@ Resources:
         Variables:
           ENVIRONMENT: !Ref Environment
           DYNAMODB_TABLE: !Ref EPLDataTable
+          USER_PREFERENCES_TABLE: !Ref UserPreferencesTable
+          FORECAST_HISTORY_TABLE: !Ref ForecastHistoryTable
           RAPIDAPI_KEY: !Ref RapidAPIKey
+          SNS_TOPIC_ARN: !Ref PushNotificationTopic
+          APNS_PLATFORM_ARN: !If [EnableAPNS, !Ref APNSPlatformApplication, !Ref 'AWS::NoValue']
           NEW_RELIC_ACCOUNT_ID: !If [EnableNewRelic, !Ref NewRelicAccountId, !Ref 'AWS::NoValue']
           NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
           NEW_RELIC_APP_NAME: !If [EnableNewRelic, !Sub 'EPL-Forecast-ScheduledFetcher-${Environment}', !Ref 'AWS::NoValue']
@@ -156,8 +242,12 @@ Resources:
         Variables:
           ENVIRONMENT: !Ref Environment
           DYNAMODB_TABLE: !Ref EPLDataTable
+          USER_PREFERENCES_TABLE: !Ref UserPreferencesTable
+          FORECAST_HISTORY_TABLE: !Ref ForecastHistoryTable
           S3_BUCKET: !Ref ICSCacheBucket
           RAPIDAPI_KEY: !Ref RapidAPIKey
+          SNS_TOPIC_ARN: !Ref PushNotificationTopic
+          APNS_PLATFORM_ARN: !If [EnableAPNS, !Ref APNSPlatformApplication, !Ref 'AWS::NoValue']
           NEW_RELIC_ACCOUNT_ID: !If [EnableNewRelic, !Ref NewRelicAccountId, !Ref 'AWS::NoValue']
           NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
           NEW_RELIC_APP_NAME: !If [EnableNewRelic, !Sub 'EPL-Forecast-LiveFetcher-${Environment}', !Ref 'AWS::NoValue']
@@ -181,6 +271,10 @@ Resources:
         Variables:
           ENVIRONMENT: !Ref Environment
           DYNAMODB_TABLE: !Ref EPLDataTable
+          USER_PREFERENCES_TABLE: !Ref UserPreferencesTable
+          FORECAST_HISTORY_TABLE: !Ref ForecastHistoryTable
+          SNS_TOPIC_ARN: !Ref PushNotificationTopic
+          APNS_PLATFORM_ARN: !If [EnableAPNS, !Ref APNSPlatformApplication, !Ref 'AWS::NoValue']
           NEW_RELIC_ACCOUNT_ID: !If [EnableNewRelic, !Ref NewRelicAccountId, !Ref 'AWS::NoValue']
           NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
           NEW_RELIC_APP_NAME: !If [EnableNewRelic, !Sub 'EPL-Forecast-APIHandler-${Environment}', !Ref 'AWS::NoValue']
@@ -267,6 +361,162 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${APIHandlerFunction.Arn}/invocations'
 
+  # Preferences endpoint resource
+  PreferencesResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref EPLForecastAPI
+      ParentId: !GetAtt EPLForecastAPI.RootResourceId
+      PathPart: preferences
+
+  # Preferences GET method
+  PreferencesGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref EPLForecastAPI
+      ResourceId: !Ref PreferencesResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${APIHandlerFunction.Arn}/invocations'
+
+  # Preferences POST method
+  PreferencesPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref EPLForecastAPI
+      ResourceId: !Ref PreferencesResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${APIHandlerFunction.Arn}/invocations'
+
+  # Preferences PUT method
+  PreferencesPutMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref EPLForecastAPI
+      ResourceId: !Ref PreferencesResource
+      HttpMethod: PUT
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${APIHandlerFunction.Arn}/invocations'
+
+  # Preferences OPTIONS method for CORS
+  PreferencesOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref EPLForecastAPI
+      ResourceId: !Ref PreferencesResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-User-ID'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+
+  # Preferences register sub-resource
+  PreferencesRegisterResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref EPLForecastAPI
+      ParentId: !Ref PreferencesResource
+      PathPart: register
+
+  # Preferences register POST method
+  PreferencesRegisterPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref EPLForecastAPI
+      ResourceId: !Ref PreferencesRegisterResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${APIHandlerFunction.Arn}/invocations'
+
+  # Preferences test sub-resource
+  PreferencesTestResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref EPLForecastAPI
+      ParentId: !Ref PreferencesResource
+      PathPart: test
+
+  # Preferences test POST method
+  PreferencesTestPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref EPLForecastAPI
+      ResourceId: !Ref PreferencesTestResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${APIHandlerFunction.Arn}/invocations'
+
+  # Preferences preview sub-resource
+  PreferencesPreviewResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref EPLForecastAPI
+      ParentId: !Ref PreferencesResource
+      PathPart: preview
+
+  # Preferences preview GET method
+  PreferencesPreviewGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref EPLForecastAPI
+      ResourceId: !Ref PreferencesPreviewResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${APIHandlerFunction.Arn}/invocations'
+
+  # Preferences stats sub-resource
+  PreferencesStatsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref EPLForecastAPI
+      ParentId: !Ref PreferencesResource
+      PathPart: stats
+
+  # Preferences stats GET method
+  PreferencesStatsGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref EPLForecastAPI
+      ResourceId: !Ref PreferencesStatsResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${APIHandlerFunction.Arn}/invocations'
+
   # API Gateway deployment
   APIDeployment:
     Type: AWS::ApiGateway::Deployment
@@ -274,6 +524,14 @@ Resources:
       - HealthMethod
       - TableMethod
       - DebugMethod
+      - PreferencesGetMethod
+      - PreferencesPostMethod
+      - PreferencesPutMethod
+      - PreferencesOptionsMethod
+      - PreferencesRegisterPostMethod
+      - PreferencesTestPostMethod
+      - PreferencesPreviewGetMethod
+      - PreferencesStatsGetMethod
     Properties:
       RestApiId: !Ref EPLForecastAPI
       StageName: !Ref Environment
@@ -328,6 +586,31 @@ Outputs:
     Value: !Ref EPLDataTable
     Export:
       Name: !Sub '${AWS::StackName}-DynamoDBTable'
+
+  UserPreferencesTable:
+    Description: User preferences DynamoDB table name
+    Value: !Ref UserPreferencesTable
+    Export:
+      Name: !Sub '${AWS::StackName}-UserPreferencesTable'
+
+  ForecastHistoryTable:
+    Description: Forecast history DynamoDB table name
+    Value: !Ref ForecastHistoryTable
+    Export:
+      Name: !Sub '${AWS::StackName}-ForecastHistoryTable'
+
+  PushNotificationTopic:
+    Description: SNS topic for push notifications
+    Value: !Ref PushNotificationTopic
+    Export:
+      Name: !Sub '${AWS::StackName}-PushNotificationTopic'
+
+  APNSPlatformApplication:
+    Condition: EnableAPNS
+    Description: APNS platform application for iOS push notifications
+    Value: !Ref APNSPlatformApplication
+    Export:
+      Name: !Sub '${AWS::StackName}-APNSPlatformApplication'
   
   S3Bucket:
     Description: S3 bucket for ICS cache

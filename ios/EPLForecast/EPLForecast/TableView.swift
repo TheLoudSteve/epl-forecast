@@ -119,13 +119,6 @@ struct TeamRowView: View {
                 Circle()
                     .fill(positionIndicatorColor)
                     .frame(width: 8, height: 8)
-                
-                // Favorite team indicator
-                if isFavorite {
-                    Image(systemName: "heart.fill")
-                        .foregroundColor(.red)
-                        .font(.caption)
-                }
             }
             
             Text("\(team.forecastedPosition)")
