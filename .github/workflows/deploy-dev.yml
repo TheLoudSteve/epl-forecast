@@ -95,6 +95,7 @@ jobs:
             "NewRelicAccountId=${{ secrets.NEW_RELIC_ACCOUNT_ID }}" \
             "NewRelicLicenseKey=${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
             "NewRelicIngestKey=${{ secrets.NEW_RELIC_INGEST_KEY }}" \
+            "APNSCertificateArn=" \
           --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
           --region ${{ env.AWS_REGION }} \
           --no-fail-on-empty-changeset
