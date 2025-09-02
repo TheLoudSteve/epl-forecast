@@ -1,0 +1,166 @@
+name: Debug Current Deployment Issue
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ENVIRONMENT: dev
+  STACK_NAME: epl-forecast-dev
+
+jobs:
+  debug-deployment:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Compare deployed stack with our template
+      run: |
+        echo "=== CURRENT STACK ANALYSIS ==="
+        
+        # Get current stack template
+        echo "Downloading current deployed template..."
+        aws cloudformation get-template --stack-name ${{ env.STACK_NAME }} --query 'TemplateBody' > /tmp/deployed-template.json
+        
+        # Get our local template size
+        LOCAL_SIZE=$(wc -l < infrastructure/step6.yaml)
+        DEPLOYED_SIZE=$(wc -l < /tmp/deployed-template.json)
+        
+        echo "Local template: $LOCAL_SIZE lines"
+        echo "Deployed template: $DEPLOYED_SIZE lines"
+        echo "Difference: $((LOCAL_SIZE - DEPLOYED_SIZE)) lines"
+        
+        # Check for key notification resources in deployed template
+        echo ""
+        echo "=== CHECKING FOR NOTIFICATION RESOURCES IN DEPLOYED TEMPLATE ==="
+        
+        if grep -q "UserPreferencesTable" /tmp/deployed-template.json; then
+          echo "✅ UserPreferencesTable found in deployed template"
+        else
+          echo "❌ UserPreferencesTable NOT found in deployed template"
+        fi
+        
+        if grep -q "PreferencesResource" /tmp/deployed-template.json; then
+          echo "✅ PreferencesResource found in deployed template"
+        else
+          echo "❌ PreferencesResource NOT found in deployed template"
+        fi
+        
+        if grep -q "PushNotificationTopic" /tmp/deployed-template.json; then
+          echo "✅ PushNotificationTopic found in deployed template"
+        else
+          echo "❌ PushNotificationTopic NOT found in deployed template"
+        fi
+        
+        # Check parameters
+        echo ""
+        echo "=== PARAMETER COMPARISON ==="
+        echo "Current stack parameters:"
+        aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query 'Stacks[0].Parameters[*].{Key:ParameterKey,Value:ParameterValue}' --output table
+        
+        echo ""
+        echo "Our local template parameters:"
+        aws cloudformation validate-template --template-body file://infrastructure/step6.yaml --query 'Parameters[*].{Key:ParameterKey,Default:DefaultValue}' --output table
+
+    - name: Create test changeset to see what would change
+      run: |
+        echo "=== CREATING TEST CHANGESET ==="
+        
+        CHANGESET_NAME="debug-changeset-$(date +%s)"
+        
+        aws cloudformation create-change-set \
+          --stack-name ${{ env.STACK_NAME }} \
+          --change-set-name $CHANGESET_NAME \
+          --template-body file://infrastructure/step6.yaml \
+          --parameters \
+            ParameterKey=Environment,ParameterValue=${{ env.ENVIRONMENT }} \
+            ParameterKey=RapidAPIKey,ParameterValue=${{ secrets.RAPIDAPI_KEY }} \
+            ParameterKey=NewRelicAccountId,ParameterValue=${{ secrets.NEW_RELIC_ACCOUNT_ID }} \
+            ParameterKey=NewRelicLicenseKey,ParameterValue=${{ secrets.NEW_RELIC_LICENSE_KEY }} \
+            ParameterKey=NewRelicIngestKey,ParameterValue=${{ secrets.NEW_RELIC_INGEST_KEY }} \
+            ParameterKey=APNSCertificateArn,ParameterValue= \
+          --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM
+        
+        echo "Waiting for changeset creation..."
+        sleep 10
+        
+        # Check changeset status
+        STATUS=$(aws cloudformation describe-change-set --stack-name ${{ env.STACK_NAME }} --change-set-name $CHANGESET_NAME --query 'Status' --output text)
+        echo "Changeset status: $STATUS"
+        
+        if [ "$STATUS" = "FAILED" ]; then
+          echo "Changeset failed:"
+          aws cloudformation describe-change-set --stack-name ${{ env.STACK_NAME }} --change-set-name $CHANGESET_NAME --query 'StatusReason' --output text
+        else
+          echo "Changeset contents:"
+          aws cloudformation describe-change-set \
+            --stack-name ${{ env.STACK_NAME }} \
+            --change-set-name $CHANGESET_NAME \
+            --query 'Changes[*].[Action,ResourceChange.LogicalResourceId,ResourceChange.ResourceType]' \
+            --output table
+          
+          CHANGE_COUNT=$(aws cloudformation describe-change-set --stack-name ${{ env.STACK_NAME }} --change-set-name $CHANGESET_NAME --query 'length(Changes)' --output text)
+          echo "Total changes that would be made: $CHANGE_COUNT"
+        fi
+        
+        # Clean up
+        echo "Cleaning up changeset..."
+        aws cloudformation delete-change-set --stack-name ${{ env.STACK_NAME }} --change-set-name $CHANGESET_NAME
+
+    - name: Force template update by adding a tag
+      run: |
+        echo "=== FORCING TEMPLATE UPDATE ==="
+        echo "Adding deployment timestamp tag to force CloudFormation to see a change..."
+        
+        # Create a temporary modified template with a unique tag
+        cp infrastructure/step6.yaml /tmp/step6-timestamped.yaml
+        
+        # Add a unique tag to the stack metadata (this forces CloudFormation to see a change)
+        sed -i '1i # Deployment timestamp: '"$(date -u +%Y%m%d%H%M%S)"'' /tmp/step6-timestamped.yaml
+        
+        CHANGESET_NAME="force-update-$(date +%s)"
+        
+        aws cloudformation create-change-set \
+          --stack-name ${{ env.STACK_NAME }} \
+          --change-set-name $CHANGESET_NAME \
+          --template-body file:///tmp/step6-timestamped.yaml \
+          --parameters \
+            ParameterKey=Environment,ParameterValue=${{ env.ENVIRONMENT }} \
+            ParameterKey=RapidAPIKey,ParameterValue=${{ secrets.RAPIDAPI_KEY }} \
+            ParameterKey=NewRelicAccountId,ParameterValue=${{ secrets.NEW_RELIC_ACCOUNT_ID }} \
+            ParameterKey=NewRelicLicenseKey,ParameterValue=${{ secrets.NEW_RELIC_LICENSE_KEY }} \
+            ParameterKey=NewRelicIngestKey,ParameterValue=${{ secrets.NEW_RELIC_INGEST_KEY }} \
+            ParameterKey=APNSCertificateArn,ParameterValue= \
+          --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM
+        
+        echo "Waiting for forced changeset creation..."
+        aws cloudformation wait change-set-create-complete --stack-name ${{ env.STACK_NAME }} --change-set-name $CHANGESET_NAME
+        
+        echo "Forced changeset contents:"
+        aws cloudformation describe-change-set \
+          --stack-name ${{ env.STACK_NAME }} \
+          --change-set-name $CHANGESET_NAME \
+          --query 'Changes[*].[Action,ResourceChange.LogicalResourceId,ResourceChange.ResourceType]' \
+          --output table
+        
+        CHANGE_COUNT=$(aws cloudformation describe-change-set --stack-name ${{ env.STACK_NAME }} --change-set-name $CHANGESET_NAME --query 'length(Changes)' --output text)
+        echo "Changes with forced update: $CHANGE_COUNT"
+        
+        if [ "$CHANGE_COUNT" -gt "0" ]; then
+          echo "🎉 Found changes! This confirms our template has updates that weren't being detected"
+          echo "Would you like to execute this changeset to deploy the notification infrastructure?"
+        else
+          echo "😞 Still no changes detected even with forced update"
+        fi
+        
+        # Clean up
+        echo "Cleaning up forced changeset..."
+        aws cloudformation delete-change-set --stack-name ${{ env.STACK_NAME }} --change-set-name $CHANGESET_NAME
