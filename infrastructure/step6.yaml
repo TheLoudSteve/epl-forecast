@@ -125,10 +125,11 @@ Resources:
                   - sns:SetEndpointAttributes
                 Resource: 
                   - !Ref PushNotificationTopic
-                  - !If 
-                    - EnableAPNS
-                    - !Ref APNSPlatformApplication
-                    - !Ref 'AWS::NoValue'
+                  # Temporarily disabled APNS platform application
+                  # - !If 
+                  #   - EnableAPNS
+                  #   - !Ref APNSPlatformApplication
+                  #   - !Ref 'AWS::NoValue'
                   - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:endpoint/APNS/*'
 
   # IAM role for New Relic AWS integration (API polling)
@@ -163,14 +164,15 @@ Resources:
                 Resource: '*'
 
   # SNS Platform Application for APNS (iOS push notifications)
-  APNSPlatformApplication:
-    Type: AWS::SNS::PlatformApplication
-    Condition: EnableAPNS
-    Properties:
-      Name: !Sub 'EPLForecast-APNS-${Environment}'
-      Platform: APNS
-      Attributes:
-        PlatformCredential: !Ref APNSCertificateArn
+  # TODO: Re-enable when we have APNS certificates configured
+  # APNSPlatformApplication:
+  #   Type: AWS::SNS::PlatformApplication
+  #   Condition: EnableAPNS
+  #   Properties:
+  #     Name: !Sub 'EPLForecast-APNS-${Environment}'
+  #     Platform: APNS
+  #     Attributes:
+  #       PlatformCredential: !Ref APNSCertificateArn
 
   # SNS Topic for push notifications
   PushNotificationTopic:
@@ -210,7 +212,7 @@ Resources:
           FORECAST_HISTORY_TABLE: !Ref ForecastHistoryTable
           RAPIDAPI_KEY: !Ref RapidAPIKey
           SNS_TOPIC_ARN: !Ref PushNotificationTopic
-          APNS_PLATFORM_ARN: !If [EnableAPNS, !Ref APNSPlatformApplication, !Ref 'AWS::NoValue']
+          APNS_PLATFORM_ARN: !Ref 'AWS::NoValue'
           NEW_RELIC_ACCOUNT_ID: !If [EnableNewRelic, !Ref NewRelicAccountId, !Ref 'AWS::NoValue']
           NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
           NEW_RELIC_APP_NAME: !If [EnableNewRelic, !Sub 'EPL-Forecast-ScheduledFetcher-${Environment}', !Ref 'AWS::NoValue']
@@ -247,7 +249,7 @@ Resources:
           S3_BUCKET: !Ref ICSCacheBucket
           RAPIDAPI_KEY: !Ref RapidAPIKey
           SNS_TOPIC_ARN: !Ref PushNotificationTopic
-          APNS_PLATFORM_ARN: !If [EnableAPNS, !Ref APNSPlatformApplication, !Ref 'AWS::NoValue']
+          APNS_PLATFORM_ARN: !Ref 'AWS::NoValue'
           NEW_RELIC_ACCOUNT_ID: !If [EnableNewRelic, !Ref NewRelicAccountId, !Ref 'AWS::NoValue']
           NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
           NEW_RELIC_APP_NAME: !If [EnableNewRelic, !Sub 'EPL-Forecast-LiveFetcher-${Environment}', !Ref 'AWS::NoValue']
@@ -274,7 +276,7 @@ Resources:
           USER_PREFERENCES_TABLE: !Ref UserPreferencesTable
           FORECAST_HISTORY_TABLE: !Ref ForecastHistoryTable
           SNS_TOPIC_ARN: !Ref PushNotificationTopic
-          APNS_PLATFORM_ARN: !If [EnableAPNS, !Ref APNSPlatformApplication, !Ref 'AWS::NoValue']
+          APNS_PLATFORM_ARN: !Ref 'AWS::NoValue'
           NEW_RELIC_ACCOUNT_ID: !If [EnableNewRelic, !Ref NewRelicAccountId, !Ref 'AWS::NoValue']
           NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
           NEW_RELIC_APP_NAME: !If [EnableNewRelic, !Sub 'EPL-Forecast-APIHandler-${Environment}', !Ref 'AWS::NoValue']
@@ -605,12 +607,13 @@ Outputs:
     Export:
       Name: !Sub '${AWS::StackName}-PushNotificationTopic'
 
-  APNSPlatformApplication:
-    Condition: EnableAPNS
-    Description: APNS platform application for iOS push notifications
-    Value: !Ref APNSPlatformApplication
-    Export:
-      Name: !Sub '${AWS::StackName}-APNSPlatformApplication'
+  # TODO: Re-enable when APNS certificates are configured
+  # APNSPlatformApplication:
+  #   Condition: EnableAPNS
+  #   Description: APNS platform application for iOS push notifications
+  #   Value: !Ref APNSPlatformApplication
+  #   Export:
+  #     Name: !Sub '${AWS::StackName}-APNSPlatformApplication'
   
   S3Bucket:
     Description: S3 bucket for ICS cache
