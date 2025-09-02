@@ -293,12 +293,22 @@ class NotificationManager:
             Result of test notification
         """
         try:
-            # Get user preferences
+            # Get user preferences, or create default ones for testing
             response = self.preferences_table.get_item(Key={'user_id': user_id})
             if 'Item' not in response:
-                return {'error': 'User preferences not found'}
-            
-            preferences = UserNotificationPreferences.from_dynamodb_item(response['Item'])
+                # For test notifications, create default preferences
+                print(f"Creating default test preferences for user: {user_id}")
+                preferences = UserNotificationPreferences(
+                    user_id=user_id,
+                    enabled=True,
+                    position_changes=True,
+                    major_changes_only=False,
+                    frequency='immediate',
+                    quiet_hours_start=22,
+                    quiet_hours_end=8
+                )
+            else:
+                preferences = UserNotificationPreferences.from_dynamodb_item(response['Item'])
             
             # Create test notification content using the enhanced generator
             test_content = notification_content_generator.generate_test_notification(preferences)
