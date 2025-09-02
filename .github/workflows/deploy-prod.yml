@@ -36,6 +36,12 @@ jobs:
         # Package api_handler with clean build directory
         mkdir -p build/api_handler
         cp backend/api_handler.py build/api_handler/
+        cp backend/models.py build/api_handler/
+        cp backend/notification_logic.py build/api_handler/
+        cp backend/notification_content_generator.py build/api_handler/
+        cp backend/notification_rate_limiter.py build/api_handler/
+        cp backend/push_notification_service.py build/api_handler/
+        cp backend/forecast_history.py build/api_handler/
         cd build/api_handler
         pip install -r ../../backend/requirements.txt -t .
         zip -r ../../lambda-packages/api_handler.zip .
@@ -44,6 +50,12 @@ jobs:
         # Package scheduled_data_fetcher with clean build directory
         mkdir -p build/scheduled_data_fetcher
         cp backend/scheduled_data_fetcher.py build/scheduled_data_fetcher/
+        cp backend/models.py build/scheduled_data_fetcher/
+        cp backend/forecast_history.py build/scheduled_data_fetcher/
+        cp backend/notification_logic.py build/scheduled_data_fetcher/
+        cp backend/notification_content_generator.py build/scheduled_data_fetcher/
+        cp backend/notification_rate_limiter.py build/scheduled_data_fetcher/
+        cp backend/push_notification_service.py build/scheduled_data_fetcher/
         cd build/scheduled_data_fetcher
         pip install -r ../../backend/requirements.txt -t .
         pip install requests -t .
@@ -53,6 +65,12 @@ jobs:
         # Package live_match_fetcher with clean build directory
         mkdir -p build/live_match_fetcher
         cp backend/live_match_fetcher.py build/live_match_fetcher/
+        cp backend/models.py build/live_match_fetcher/
+        cp backend/forecast_history.py build/live_match_fetcher/
+        cp backend/notification_logic.py build/live_match_fetcher/
+        cp backend/notification_content_generator.py build/live_match_fetcher/
+        cp backend/notification_rate_limiter.py build/live_match_fetcher/
+        cp backend/push_notification_service.py build/live_match_fetcher/
         cd build/live_match_fetcher
         pip install -r ../../backend/requirements.txt -t .
         pip install requests icalendar -t .

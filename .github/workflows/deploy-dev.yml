@@ -142,8 +142,8 @@ jobs:
       run: |
         cd backend
         pip install -r requirements.txt -t .
-        zip -r scheduled_data_fetcher.zip scheduled_data_fetcher.py boto3* requests* dateutil* six* urllib3* botocore* jmespath* s3transfer* certifi* charset_normalizer* idna* newrelic* icalendar*
-        zip -r api_handler.zip api_handler.py boto3* botocore* jmespath* s3transfer* urllib3* certifi* dateutil* six*
+        zip -r scheduled_data_fetcher.zip scheduled_data_fetcher.py models.py forecast_history.py notification_logic.py notification_content_generator.py notification_rate_limiter.py push_notification_service.py boto3* requests* dateutil* six* urllib3* botocore* jmespath* s3transfer* certifi* charset_normalizer* idna* newrelic* icalendar*
+        zip -r api_handler.zip api_handler.py models.py notification_logic.py notification_content_generator.py notification_rate_limiter.py push_notification_service.py forecast_history.py boto3* botocore* jmespath* s3transfer* urllib3* certifi* dateutil* six*
     
     - name: Update Lambda functions
       run: |
