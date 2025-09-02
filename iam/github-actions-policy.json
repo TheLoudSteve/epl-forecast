@@ -14,10 +14,19 @@
     {
       "Effect": "Allow",
       "Action": [
+        "cloudformation:ValidateTemplate",
+        "cloudformation:GetTemplateSummary",
+        "cloudformation:EstimateTemplateCost",
+        "cloudformation:ListStacks"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
         "iam:CreateRole",
         "iam:DeleteRole",
         "iam:GetRole",
-        "iam:PassRole",
         "iam:AttachRolePolicy",
         "iam:DetachRolePolicy",
         "iam:PutRolePolicy",
@@ -31,6 +40,16 @@
       "Resource": [
         "arn:aws:iam::*:role/epl-*",
         "arn:aws:iam::*:role/NewRelic*",
+        "arn:aws:iam::*:role/NewRelicInfrastructure-*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "iam:PassRole"
+      ],
+      "Resource": [
+        "arn:aws:iam::*:role/epl-forecast-*-LambdaExecutionRole-*",
         "arn:aws:iam::*:role/NewRelicInfrastructure-*"
       ]
     },
@@ -62,7 +81,11 @@
       ],
       "Resource": [
         "arn:aws:s3:::epl-*",
-        "arn:aws:s3:::epl-*/*"
+        "arn:aws:s3:::epl-*/*",
+        "arn:aws:s3:::newrelic-*",
+        "arn:aws:s3:::newrelic-*/*",
+        "arn:aws:s3:::epl-forecast-*-deployments-*",
+        "arn:aws:s3:::epl-forecast-*-deployments-*/*"
       ]
     },
     {
@@ -105,35 +128,6 @@
         "firehose:UntagDeliveryStream"
       ],
       "Resource": "arn:aws:firehose:*:*:deliverystream/NewRelic-*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "s3:CreateBucket",
-        "s3:DeleteBucket",
-        "s3:GetBucketLocation",
-        "s3:ListBucket",
-        "s3:PutBucketPolicy",
-        "s3:DeleteBucketPolicy",
-        "s3:PutLifecycleConfiguration",
-        "s3:PutBucketPublicAccessBlock"
-      ],
-      "Resource": [
-        "arn:aws:s3:::newrelic-*",
-        "arn:aws:s3:::epl-forecast-*-deployments-*"
-      ]
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "s3:PutObject",
-        "s3:DeleteObject",
-        "s3:GetObject"
-      ],
-      "Resource": [
-        "arn:aws:s3:::newrelic-*/*",
-        "arn:aws:s3:::epl-forecast-*-deployments-*/*"
-      ]
     }
   ]
 }
