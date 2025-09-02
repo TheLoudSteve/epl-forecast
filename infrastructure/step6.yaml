@@ -19,15 +19,21 @@ Parameters:
     NoEcho: true
     Description: New Relic license key for Lambda monitoring
     Default: ""
-  APNSCertificateArn:
+  APNSCertificate:
     Type: String
-    Description: ARN of the APNS certificate uploaded to AWS Certificate Manager (optional)
+    NoEcho: true
+    Description: Base64-encoded APNS certificate (.p12 file content)
+    Default: ""
+  APNSCertificatePassword:
+    Type: String
+    NoEcho: true
+    Description: Password for the APNS certificate
     Default: ""
 
 Conditions:
   IsProduction: !Equals [!Ref Environment, 'prod']
   EnableNewRelic: !Not [!Equals [!Ref NewRelicAccountId, ""]]
-  EnableAPNS: !Not [!Equals [!Ref APNSCertificateArn, ""]]
+  EnableAPNS: !Not [!Equals [!Ref APNSCertificate, ""]]
   
 Resources:
   # DynamoDB table for caching EPL data
@@ -96,6 +102,25 @@ Resources:
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
 
+  # SNS Topic for push notifications
+  PushNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub 'epl-forecast-notifications-${Environment}'
+      DisplayName: !Sub 'EPL Forecast Notifications (${Environment})'
+
+  # APNS Platform Application for iOS push notifications
+  APNSPlatformApplication:
+    Type: AWS::SNS::PlatformApplication
+    Condition: EnableAPNS
+    Properties:
+      Name: !Sub 'EPLForecast-APNS-${Environment}'
+      Platform: APNS
+      Attributes:
+        # For production, use APNS. For development/sandbox, use APNS_SANDBOX  
+        PlatformCredential: !Ref APNSCertificate
+        PlatformPrincipal: !Ref APNSCertificatePassword
+
   # IAM role for Lambda functions
   LambdaExecutionRole:
     Type: AWS::IAM::Role
@@ -125,12 +150,11 @@ Resources:
                   - sns:SetEndpointAttributes
                 Resource: 
                   - !Ref PushNotificationTopic
-                  # Temporarily disabled APNS platform application
-                  # - !If 
-                  #   - EnableAPNS
-                  #   - !Ref APNSPlatformApplication
-                  #   - !Ref 'AWS::NoValue'
-                  - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:endpoint/APNS/*'
+                  - !If 
+                    - EnableAPNS
+                    - !Ref APNSPlatformApplication
+                    - !Ref 'AWS::NoValue'
+                  - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:endpoint/APNS*/*'
 
   # IAM role for New Relic AWS integration (API polling)
   NewRelicInfrastructureRole:
@@ -212,7 +236,10 @@ Resources:
           FORECAST_HISTORY_TABLE: !Ref ForecastHistoryTable
           RAPIDAPI_KEY: !Ref RapidAPIKey
           SNS_TOPIC_ARN: !Ref PushNotificationTopic
-          APNS_PLATFORM_ARN: !Ref 'AWS::NoValue'
+          APNS_PLATFORM_ARN: !If 
+            - EnableAPNS 
+            - !Ref APNSPlatformApplication
+            - !Ref 'AWS::NoValue'
           NEW_RELIC_ACCOUNT_ID: !If [EnableNewRelic, !Ref NewRelicAccountId, !Ref 'AWS::NoValue']
           NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
           NEW_RELIC_APP_NAME: !If [EnableNewRelic, !Sub 'EPL-Forecast-ScheduledFetcher-${Environment}', !Ref 'AWS::NoValue']
@@ -249,7 +276,10 @@ Resources:
           S3_BUCKET: !Ref ICSCacheBucket
           RAPIDAPI_KEY: !Ref RapidAPIKey
           SNS_TOPIC_ARN: !Ref PushNotificationTopic
-          APNS_PLATFORM_ARN: !Ref 'AWS::NoValue'
+          APNS_PLATFORM_ARN: !If 
+            - EnableAPNS 
+            - !Ref APNSPlatformApplication
+            - !Ref 'AWS::NoValue'
           NEW_RELIC_ACCOUNT_ID: !If [EnableNewRelic, !Ref NewRelicAccountId, !Ref 'AWS::NoValue']
           NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
           NEW_RELIC_APP_NAME: !If [EnableNewRelic, !Sub 'EPL-Forecast-LiveFetcher-${Environment}', !Ref 'AWS::NoValue']
@@ -276,7 +306,10 @@ Resources:
           USER_PREFERENCES_TABLE: !Ref UserPreferencesTable
           FORECAST_HISTORY_TABLE: !Ref ForecastHistoryTable
           SNS_TOPIC_ARN: !Ref PushNotificationTopic
-          APNS_PLATFORM_ARN: !Ref 'AWS::NoValue'
+          APNS_PLATFORM_ARN: !If 
+            - EnableAPNS 
+            - !Ref APNSPlatformApplication
+            - !Ref 'AWS::NoValue'
           NEW_RELIC_ACCOUNT_ID: !If [EnableNewRelic, !Ref NewRelicAccountId, !Ref 'AWS::NoValue']
           NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
           NEW_RELIC_APP_NAME: !If [EnableNewRelic, !Sub 'EPL-Forecast-APIHandler-${Environment}', !Ref 'AWS::NoValue']
@@ -607,13 +640,12 @@ Outputs:
     Export:
       Name: !Sub '${AWS::StackName}-PushNotificationTopic'
 
-  # TODO: Re-enable when APNS certificates are configured
-  # APNSPlatformApplication:
-  #   Condition: EnableAPNS
-  #   Description: APNS platform application for iOS push notifications
-  #   Value: !Ref APNSPlatformApplication
-  #   Export:
-  #     Name: !Sub '${AWS::StackName}-APNSPlatformApplication'
+  APNSPlatformApplication:
+    Condition: EnableAPNS
+    Description: APNS platform application for iOS push notifications
+    Value: !Ref APNSPlatformApplication
+    Export:
+      Name: !Sub '${AWS::StackName}-APNSPlatformApplication'
   
   S3Bucket:
     Description: S3 bucket for ICS cache

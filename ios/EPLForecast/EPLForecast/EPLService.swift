@@ -9,7 +9,7 @@ class EPLService: ObservableObject {
     @Published var errorMessage: String?
     @Published var lastUpdated: String?
     
-    private let baseURL = "https://1e4u1ghr3i.execute-api.us-east-1.amazonaws.com/dev"  // Temporarily pointing to dev for notification testing
+    private let baseURL = "https://aiighxj72l.execute-api.us-west-2.amazonaws.com/prod"
     private var refreshTimer: Timer?
     private var isAppActive = true
     

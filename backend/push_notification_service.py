@@ -58,12 +58,22 @@ class PushNotificationService:
             # Create platform-specific message payload
             message_payload = self._create_message_payload(content)
             
-            # Send notification via SNS
-            response = sns.publish(
-                TargetArn=endpoint_arn,
-                Message=json.dumps(message_payload),
-                MessageStructure='json'
-            )
+            # Send notification via SNS (or mock in dev mode)
+            if endpoint_result.get('mock') and self.environment in ['dev', 'test']:
+                # Mock successful SNS publish for development
+                print(f"DEVELOPMENT MODE: Simulating push notification send to {preferences.user_id}")
+                print(f"  Mock Endpoint: {endpoint_arn}")
+                print(f"  Title: {content.title}")
+                print(f"  Body: {content.body}")
+                response = {
+                    'MessageId': f'mock-message-{int(datetime.now(timezone.utc).timestamp())}'
+                }
+            else:
+                response = sns.publish(
+                    TargetArn=endpoint_arn,
+                    Message=json.dumps(message_payload),
+                    MessageStructure='json'
+                )
             
             print(f"Push notification sent successfully to {preferences.user_id}")
             print(f"  Message ID: {response.get('MessageId')}")
@@ -131,11 +141,21 @@ class PushNotificationService:
             Result with endpoint ARN or error
         """
         if not self.apns_platform_arn:
-            return {
-                'success': False,
-                'error': 'APNS platform application not configured',
-                'user_id': user_id
-            }
+            # In development/test mode, simulate successful endpoint creation
+            if self.environment in ['dev', 'test']:
+                print(f"DEVELOPMENT MODE: Simulating endpoint creation for user {user_id}")
+                return {
+                    'success': True,
+                    'endpoint_arn': f'arn:aws:sns:{region}:123456789:app/APNS_SANDBOX/EPLForecast/{user_id}',  # Mock ARN
+                    'user_id': user_id,
+                    'mock': True
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': 'APNS platform application not configured',
+                    'user_id': user_id
+                }
         
         try:
             # Create platform endpoint
