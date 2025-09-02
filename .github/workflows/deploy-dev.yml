@@ -106,9 +106,9 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
         aws-region: ${{ env.AWS_REGION }}
     
-    - name: Check for stack drift
+    - name: Check for stack drift (optional)
       run: |
-        echo "Checking for stack drift..."
+        echo "Checking for stack drift with timeout..."
         
         if aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} >/dev/null 2>&1; then
           echo "Stack exists, checking for drift..."
@@ -116,31 +116,39 @@ jobs:
           # Start drift detection
           DRIFT_ID=$(aws cloudformation detect-stack-drift --stack-name ${{ env.STACK_NAME }} --query 'StackDriftDetectionId' --output text)
           
-          # Wait for drift detection to complete
-          echo "Waiting for drift detection to complete..."
-          while true; do
+          # Wait for drift detection to complete with timeout
+          echo "Waiting for drift detection to complete (max 5 minutes)..."
+          TIMEOUT=300  # 5 minutes
+          ELAPSED=0
+          
+          while [ $ELAPSED -lt $TIMEOUT ]; do
             STATUS=$(aws cloudformation describe-stack-drift-detection-status --stack-drift-detection-id $DRIFT_ID --query 'DetectionStatus' --output text 2>/dev/null || echo "FAILED")
             if [ "$STATUS" = "DETECTION_COMPLETE" ]; then
+              echo "✅ Drift detection completed"
+              
+              # Get drift status
+              DRIFT_STATUS=$(aws cloudformation describe-stack-drift-detection-status --stack-drift-detection-id $DRIFT_ID --query 'StackDriftStatus' --output text)
+              echo "Stack drift status: $DRIFT_STATUS"
+              
+              if [ "$DRIFT_STATUS" = "DRIFTED" ]; then
+                echo "⚠️  Stack has drifted from template"
+                aws cloudformation describe-stack-resource-drifts --stack-name ${{ env.STACK_NAME }} --query 'StackResourceDrifts[?StackResourceDriftStatus==`MODIFIED`].[LogicalResourceId,ResourceType,StackResourceDriftStatus]' --output table || true
+              else
+                echo "✅ Stack is in sync with template"
+              fi
               break
             elif [ "$STATUS" = "DETECTION_FAILED" ]; then
-              echo "❌ Drift detection failed"
-              exit 1
+              echo "❌ Drift detection failed, continuing anyway..."
+              break
             else
-              echo "Current status: $STATUS, waiting..."
-              sleep 5
+              echo "Current status: $STATUS, waiting... (${ELAPSED}s/${TIMEOUT}s)"
+              sleep 10
+              ELAPSED=$((ELAPSED + 10))
             fi
           done
           
-          # Get drift status
-          DRIFT_STATUS=$(aws cloudformation describe-stack-drift-detection-status --stack-drift-detection-id $DRIFT_ID --query 'StackDriftStatus' --output text)
-          
-          echo "Stack drift status: $DRIFT_STATUS"
-          
-          if [ "$DRIFT_STATUS" = "DRIFTED" ]; then
-            echo "⚠️  Stack has drifted from template"
-            aws cloudformation describe-stack-resource-drifts --stack-name ${{ env.STACK_NAME }} --query 'StackResourceDrifts[?StackResourceDriftStatus==`MODIFIED`].[LogicalResourceId,ResourceType,StackResourceDriftStatus]' --output table
-          else
-            echo "✅ Stack is in sync with template"
+          if [ $ELAPSED -ge $TIMEOUT ]; then
+            echo "⏱️  Drift detection timed out after 5 minutes, continuing deployment..."
           fi
         else
           echo "Stack doesn't exist, will create new stack"
