@@ -300,12 +300,10 @@ class NotificationManager:
                 print(f"Creating default test preferences for user: {user_id}")
                 preferences = UserNotificationPreferences(
                     user_id=user_id,
+                    team_name="Liverpool",  # Default team for test
                     enabled=True,
-                    position_changes=True,
-                    major_changes_only=False,
-                    frequency='immediate',
-                    quiet_hours_start=22,
-                    quiet_hours_end=8
+                    notification_timing=NotificationTiming.IMMEDIATE,
+                    notification_sensitivity=NotificationSensitivity.ANY_CHANGE
                 )
             else:
                 preferences = UserNotificationPreferences.from_dynamodb_item(response['Item'])
