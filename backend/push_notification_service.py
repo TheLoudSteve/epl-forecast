@@ -180,16 +180,32 @@ class PushNotificationService:
         except sns.exceptions.InvalidParameterException as e:
             # Handle case where endpoint already exists
             if 'already exists' in str(e):
-                # Extract endpoint ARN from error message or handle differently
-                print(f"Endpoint already exists for user {user_id}, attempting to retrieve...")
+                print(f"Endpoint already exists for user {user_id}, finding existing endpoint...")
                 
-                # In production, you'd want to store endpoint ARNs to avoid this
-                # For now, we'll try to create anyway and handle the specific error
-                return {
-                    'success': False,
-                    'error': 'Endpoint management needs improvement - store endpoint ARNs',
-                    'user_id': user_id
-                }
+                # Find the existing endpoint by listing platform endpoints
+                # This is a workaround - in production you'd store endpoint ARNs
+                try:
+                    existing_arn = self._find_existing_endpoint(push_token, user_id)
+                    if existing_arn:
+                        print(f"Found existing endpoint for user {user_id}: {existing_arn}")
+                        return {
+                            'success': True,
+                            'endpoint_arn': existing_arn,
+                            'user_id': user_id
+                        }
+                    else:
+                        return {
+                            'success': False,
+                            'error': 'Could not find existing endpoint',
+                            'user_id': user_id
+                        }
+                except Exception as find_error:
+                    print(f"Error finding existing endpoint: {find_error}")
+                    return {
+                        'success': False,
+                        'error': f'Could not retrieve existing endpoint: {str(find_error)}',
+                        'user_id': user_id
+                    }
             else:
                 return {
                     'success': False,
@@ -204,6 +220,39 @@ class PushNotificationService:
                 'error': str(e),
                 'user_id': user_id
             }
+    
+    def _find_existing_endpoint(self, push_token: str, user_id: str) -> Optional[str]:
+        """
+        Find existing SNS endpoint for the given push token.
+        
+        Args:
+            push_token: iOS device push token
+            user_id: User identifier (for logging)
+            
+        Returns:
+            Endpoint ARN if found, None otherwise
+        """
+        try:
+            # List platform endpoints to find existing one
+            paginator = sns.get_paginator('list_endpoints_by_platform_application')
+            
+            for page in paginator.paginate(PlatformApplicationArn=self.apns_platform_arn):
+                for endpoint in page['Endpoints']:
+                    endpoint_attributes = sns.get_endpoint_attributes(
+                        EndpointArn=endpoint['EndpointArn']
+                    )['Attributes']
+                    
+                    # Check if this endpoint matches our push token
+                    if endpoint_attributes.get('Token') == push_token:
+                        print(f"Found existing endpoint for push token (user {user_id})")
+                        return endpoint['EndpointArn']
+            
+            print(f"No existing endpoint found for push token (user {user_id})")
+            return None
+            
+        except Exception as e:
+            print(f"Error searching for existing endpoint: {e}")
+            return None
     
     def _create_message_payload(self, content: NotificationContent) -> Dict[str, str]:
         """
