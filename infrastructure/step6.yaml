@@ -19,21 +19,15 @@ Parameters:
     NoEcho: true
     Description: New Relic license key for Lambda monitoring
     Default: ""
-  APNSCertificate:
+  APNSPlatformApplicationArn:
     Type: String
-    NoEcho: true
-    Description: Base64-encoded APNS certificate (.p12 file content)
-    Default: ""
-  APNSCertificatePassword:
-    Type: String
-    NoEcho: true
-    Description: Password for the APNS certificate
+    Description: ARN of the pre-created APNS platform application (optional)
     Default: ""
 
 Conditions:
   IsProduction: !Equals [!Ref Environment, 'prod']
   EnableNewRelic: !Not [!Equals [!Ref NewRelicAccountId, ""]]
-  EnableAPNS: !Not [!Equals [!Ref APNSCertificate, ""]]
+  EnableAPNS: !Not [!Equals [!Ref APNSPlatformApplicationArn, ""]]
   
 Resources:
   # DynamoDB table for caching EPL data
@@ -109,17 +103,8 @@ Resources:
       TopicName: !Sub 'epl-forecast-notifications-${Environment}'
       DisplayName: !Sub 'EPL Forecast Notifications (${Environment})'
 
-  # APNS Platform Application for iOS push notifications
-  APNSPlatformApplication:
-    Type: AWS::SNS::PlatformApplication
-    Condition: EnableAPNS
-    Properties:
-      Name: !Sub 'EPLForecast-APNS-${Environment}'
-      Platform: APNS
-      Attributes:
-        # For production, use APNS. For development/sandbox, use APNS_SANDBOX  
-        PlatformCredential: !Ref APNSCertificate
-        PlatformPrincipal: !Ref APNSCertificatePassword
+  # Note: APNS Platform Application created manually due to CloudFormation limitation in us-west-2
+  # The ARN is passed via APNSPlatformApplicationArn parameter
 
   # IAM role for Lambda functions
   LambdaExecutionRole:
@@ -152,7 +137,7 @@ Resources:
                   - !Ref PushNotificationTopic
                   - !If 
                     - EnableAPNS
-                    - !Ref APNSPlatformApplication
+                    - !Ref APNSPlatformApplicationArn
                     - !Ref 'AWS::NoValue'
                   - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:endpoint/APNS*/*'
 
@@ -238,7 +223,7 @@ Resources:
           SNS_TOPIC_ARN: !Ref PushNotificationTopic
           APNS_PLATFORM_ARN: !If 
             - EnableAPNS 
-            - !Ref APNSPlatformApplication
+            - !Ref APNSPlatformApplicationArn
             - !Ref 'AWS::NoValue'
           NEW_RELIC_ACCOUNT_ID: !If [EnableNewRelic, !Ref NewRelicAccountId, !Ref 'AWS::NoValue']
           NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
@@ -278,7 +263,7 @@ Resources:
           SNS_TOPIC_ARN: !Ref PushNotificationTopic
           APNS_PLATFORM_ARN: !If 
             - EnableAPNS 
-            - !Ref APNSPlatformApplication
+            - !Ref APNSPlatformApplicationArn
             - !Ref 'AWS::NoValue'
           NEW_RELIC_ACCOUNT_ID: !If [EnableNewRelic, !Ref NewRelicAccountId, !Ref 'AWS::NoValue']
           NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
@@ -308,7 +293,7 @@ Resources:
           SNS_TOPIC_ARN: !Ref PushNotificationTopic
           APNS_PLATFORM_ARN: !If 
             - EnableAPNS 
-            - !Ref APNSPlatformApplication
+            - !Ref APNSPlatformApplicationArn
             - !Ref 'AWS::NoValue'
           NEW_RELIC_ACCOUNT_ID: !If [EnableNewRelic, !Ref NewRelicAccountId, !Ref 'AWS::NoValue']
           NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
@@ -642,8 +627,8 @@ Outputs:
 
   APNSPlatformApplication:
     Condition: EnableAPNS
-    Description: APNS platform application for iOS push notifications
-    Value: !Ref APNSPlatformApplication
+    Description: APNS platform application for iOS push notifications (manually created)
+    Value: !Ref APNSPlatformApplicationArn
     Export:
       Name: !Sub '${AWS::StackName}-APNSPlatformApplication'
   
