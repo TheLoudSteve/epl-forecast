@@ -1,6 +1,52 @@
 import SwiftUI
 import Combine
 
+enum NotificationTiming: String, CaseIterable {
+    case immediate = "immediate"
+    case endOfDay = "end_of_day"
+    
+    var displayName: String {
+        switch self {
+        case .immediate:
+            return "Immediate"
+        case .endOfDay:
+            return "End of Day"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .immediate:
+            return "Get notified as soon as forecast changes occur"
+        case .endOfDay:
+            return "Get a summary after all games are finished for the day"
+        }
+    }
+}
+
+enum NotificationSensitivity: String, CaseIterable {
+    case anyChange = "any_change"
+    case significantOnly = "significant_only"
+    
+    var displayName: String {
+        switch self {
+        case .anyChange:
+            return "Any Position Change"
+        case .significantOnly:
+            return "Significant Changes Only"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .anyChange:
+            return "Notify for any movement up or down in forecast"
+        case .significantOnly:
+            return "Notify for title, Champions League, or relegation changes"
+        }
+    }
+}
+
 class UserSettings: ObservableObject {
     static let shared = UserSettings()
     
@@ -31,6 +77,32 @@ class UserSettings: ObservableObject {
         }
     }
     
+    // MARK: - Notification Preferences
+    
+    @Published var notificationsEnabled: Bool = true {
+        didSet {
+            UserDefaults.standard.set(notificationsEnabled, forKey: "notificationsEnabled")
+            iCloudStore.set(notificationsEnabled, forKey: "notificationsEnabled")
+            iCloudStore.synchronize()
+        }
+    }
+    
+    @Published var notificationTiming: NotificationTiming = .immediate {
+        didSet {
+            UserDefaults.standard.set(notificationTiming.rawValue, forKey: "notificationTiming")
+            iCloudStore.set(notificationTiming.rawValue, forKey: "notificationTiming")
+            iCloudStore.synchronize()
+        }
+    }
+    
+    @Published var notificationSensitivity: NotificationSensitivity = .anyChange {
+        didSet {
+            UserDefaults.standard.set(notificationSensitivity.rawValue, forKey: "notificationSensitivity")
+            iCloudStore.set(notificationSensitivity.rawValue, forKey: "notificationSensitivity")
+            iCloudStore.synchronize()
+        }
+    }
+
     private init() {
         // Load from iCloud if available, otherwise from UserDefaults
         let iCloudFavoriteTeam = iCloudStore.string(forKey: "favoriteTeam")
@@ -38,6 +110,16 @@ class UserSettings: ObservableObject {
         
         let iCloudHasLaunched = iCloudStore.bool(forKey: "hasLaunchedBefore")
         let localHasLaunched = UserDefaults.standard.bool(forKey: "hasLaunchedBefore")
+        
+        // Load notification preferences
+        let iCloudNotificationsEnabled = iCloudStore.object(forKey: "notificationsEnabled") as? Bool
+        let localNotificationsEnabled = UserDefaults.standard.object(forKey: "notificationsEnabled") as? Bool
+        
+        let iCloudTimingRaw = iCloudStore.string(forKey: "notificationTiming")
+        let localTimingRaw = UserDefaults.standard.string(forKey: "notificationTiming")
+        
+        let iCloudSensitivityRaw = iCloudStore.string(forKey: "notificationSensitivity") 
+        let localSensitivityRaw = UserDefaults.standard.string(forKey: "notificationSensitivity")
         
         // Use iCloud data if it exists and is not empty, otherwise use local
         if let iCloudTeam = iCloudFavoriteTeam, !iCloudTeam.isEmpty {
@@ -48,6 +130,23 @@ class UserSettings: ObservableObject {
         
         // For boolean, use iCloud if it's been launched before there
         self.hasLaunchedBefore = iCloudHasLaunched || localHasLaunched
+        
+        // Load notification preferences with defaults
+        self.notificationsEnabled = iCloudNotificationsEnabled ?? localNotificationsEnabled ?? true
+        
+        if let timingRaw = iCloudTimingRaw ?? localTimingRaw,
+           let timing = NotificationTiming(rawValue: timingRaw) {
+            self.notificationTiming = timing
+        } else {
+            self.notificationTiming = .immediate
+        }
+        
+        if let sensitivityRaw = iCloudSensitivityRaw ?? localSensitivityRaw,
+           let sensitivity = NotificationSensitivity(rawValue: sensitivityRaw) {
+            self.notificationSensitivity = sensitivity
+        } else {
+            self.notificationSensitivity = .anyChange
+        }
         
         // Sync with SharedDataManager for widget
         SharedDataManager.shared.favoriteTeam = self.favoriteTeam
@@ -85,6 +184,23 @@ class UserSettings: ObservableObject {
                 let newValue = iCloudStore.bool(forKey: "hasLaunchedBefore")
                 if newValue != self.hasLaunchedBefore {
                     self.hasLaunchedBefore = newValue
+                }
+            case "notificationsEnabled":
+                let newValue = iCloudStore.bool(forKey: "notificationsEnabled")
+                if newValue != self.notificationsEnabled {
+                    self.notificationsEnabled = newValue
+                }
+            case "notificationTiming":
+                if let newValueRaw = iCloudStore.string(forKey: "notificationTiming"),
+                   let newValue = NotificationTiming(rawValue: newValueRaw),
+                   newValue != self.notificationTiming {
+                    self.notificationTiming = newValue
+                }
+            case "notificationSensitivity":
+                if let newValueRaw = iCloudStore.string(forKey: "notificationSensitivity"),
+                   let newValue = NotificationSensitivity(rawValue: newValueRaw),
+                   newValue != self.notificationSensitivity {
+                    self.notificationSensitivity = newValue
                 }
             default:
                 break
