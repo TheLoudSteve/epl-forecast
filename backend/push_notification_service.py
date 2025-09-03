@@ -177,9 +177,9 @@ class PushNotificationService:
                 'user_id': user_id
             }
             
-        except sns.exceptions.InvalidParameterException as e:
-            # Handle case where endpoint already exists
-            if 'already exists' in str(e):
+        except Exception as e:
+            # Handle case where endpoint already exists (various possible exception types)
+            if 'already exists' in str(e) or 'InvalidParameter' in str(e):
                 print(f"Endpoint already exists for user {user_id}, finding existing endpoint...")
                 
                 # Find the existing endpoint by listing platform endpoints
@@ -212,14 +212,6 @@ class PushNotificationService:
                     'error': f'Invalid parameter: {str(e)}',
                     'user_id': user_id
                 }
-                
-        except Exception as e:
-            print(f"Error creating SNS endpoint for user {user_id}: {e}")
-            return {
-                'success': False,
-                'error': str(e),
-                'user_id': user_id
-            }
     
     def _find_existing_endpoint(self, push_token: str, user_id: str) -> Optional[str]:
         """
