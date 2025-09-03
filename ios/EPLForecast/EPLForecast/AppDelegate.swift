@@ -7,12 +7,22 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         
         // Initialize New Relic monitoring with proper configuration
         // Configure New Relic before starting
+        #if targetEnvironment(simulator)
+        // Disable features that cause CoreTelephony warnings in simulator
+        NewRelic.enableFeatures([
+            .NRFeatureFlag_DefaultInteractions,
+            .NRFeatureFlag_HttpResponseBodyCapture,
+            .NRFeatureFlag_NetworkRequestEvents
+        ])
+        #else
+        // Full feature set for device builds
         NewRelic.enableFeatures([
             .NRFeatureFlag_DefaultInteractions,
             .NRFeatureFlag_CrashReporting,
             .NRFeatureFlag_HttpResponseBodyCapture,
             .NRFeatureFlag_NetworkRequestEvents
         ])
+        #endif
         
         // New Relic configuration - replace with your actual values
         let newRelicAccountId = "7052187"
@@ -25,6 +35,10 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         NewRelic.start(withApplicationToken: newRelicAppToken)
         
         print("New Relic initialized successfully with Account ID: \(newRelicAccountId)")
+        
+        #if targetEnvironment(simulator)
+        print("Running in simulator - some New Relic features disabled to avoid CoreTelephony warnings")
+        #endif
         
         // Record app launch event
         NewRelic.recordCustomEvent("AppLaunch", attributes: [
@@ -72,7 +86,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                 // Track permission granted
                 NewRelic.recordCustomEvent("PushNotificationPermission", attributes: [
                     "granted": true,
-                    "timestamp": Date().timeIntervalSince1970
+                    "eventTime": Date().timeIntervalSince1970
                 ])
             } else {
                 print("Push notification permission denied: \(error?.localizedDescription ?? "unknown error")")
@@ -81,7 +95,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                 NewRelic.recordCustomEvent("PushNotificationPermission", attributes: [
                     "granted": false,
                     "error": error?.localizedDescription ?? "unknown",
-                    "timestamp": Date().timeIntervalSince1970
+                    "eventTime": Date().timeIntervalSince1970
                 ])
             }
         }
@@ -95,7 +109,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         // Track token registration
         NewRelic.recordCustomEvent("APNSTokenReceived", attributes: [
             "tokenLength": tokenString.count,
-            "timestamp": Date().timeIntervalSince1970
+            "eventTime": Date().timeIntervalSince1970
         ])
         
         // Register token with backend
@@ -109,7 +123,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         // Track token registration failure
         NewRelic.recordCustomEvent("APNSTokenFailed", attributes: [
             "error": error.localizedDescription,
-            "timestamp": Date().timeIntervalSince1970
+            "eventTime": Date().timeIntervalSince1970
         ])
     }
     
@@ -180,7 +194,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         NewRelic.recordCustomEvent("PushNotificationReceived", attributes: [
             "appState": "foreground",
             "title": notification.request.content.title,
-            "timestamp": Date().timeIntervalSince1970
+            "eventTime": Date().timeIntervalSince1970
         ])
     }
     
@@ -190,7 +204,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         NewRelic.recordCustomEvent("PushNotificationTapped", attributes: [
             "actionIdentifier": response.actionIdentifier,
             "title": response.notification.request.content.title,
-            "timestamp": Date().timeIntervalSince1970
+            "eventTime": Date().timeIntervalSince1970
         ])
         
         completionHandler()

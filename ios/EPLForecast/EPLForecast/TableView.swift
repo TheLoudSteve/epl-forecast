@@ -200,7 +200,7 @@ struct TeamRowView: View {
 
 func teamLogoURL(for teamName: String) -> String {
     let normalizedName = teamName.lowercased().trimmingCharacters(in: .whitespaces)
-    print("Looking for logo for team: '\(teamName)' (normalized: '\(normalizedName)')")
+    // Uncomment for debugging: print("Looking for logo for team: '\(teamName)' (normalized: '\(normalizedName)')")
     
     switch normalizedName {
     case let name where name.contains("arsenal"):
@@ -249,8 +249,13 @@ func teamLogoURL(for teamName: String) -> String {
         return "https://resources.premierleague.com/premierleague/badges/50/t2.png"
     case let name where name.contains("southampton"):
         return "https://resources.premierleague.com/premierleague/badges/50/t20.png"
+    case let name where name.contains("sunderland"):
+        return "https://resources.premierleague.com/premierleague/badges/50/t56.png"
     default:
+        // Only log missing logos in debug builds
+        #if DEBUG
         print("No logo found for team: '\(teamName)'")
+        #endif
         return ""
     }
 }
