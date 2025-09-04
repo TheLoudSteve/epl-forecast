@@ -265,7 +265,7 @@ extension Team {
         case let name where name.contains("leicester"):
             return Color(red: 0, green: 0.2, blue: 0.8) // Leicester blue
         case let name where name.contains("leeds"):
-            return Color.white // Leeds white
+            return Color(red: 0, green: 0.2, blue: 0.8) // Leeds blue (readable alternative)
         case let name where name.contains("southampton"):
             return Color(red: 1, green: 0, blue: 0) // Southampton red
         default:

@@ -3,10 +3,11 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var userSettings = UserSettings.shared
     @State private var showingSettings = false
+    @State private var shouldResetScroll = false
     
     var body: some View {
         NavigationStack {
-            TableView()
+            TableView(shouldResetScroll: $shouldResetScroll)
                 .navigationTitle("Premier League Forecast")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -21,6 +22,12 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showingSettings) {
             SettingsView()
+        }
+        .onChange(of: showingSettings) { _, isShowing in
+            if !isShowing {
+                // Settings sheet was just dismissed
+                shouldResetScroll = true
+            }
         }
         .fullScreenCover(isPresented: .constant(userSettings.showOnboarding)) {
             FavoriteTeamSelectionView(isOnboarding: true)

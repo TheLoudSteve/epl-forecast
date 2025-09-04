@@ -1,6 +1,6 @@
 import Foundation
 
-struct Team: Codable, Identifiable {
+struct Team: Codable, Identifiable, Equatable {
     let name: String
     let played: Int
     let won: Int
