@@ -107,8 +107,10 @@ jobs:
       run: |
         echo "Checking for stack drift with timeout..."
         
-        if aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} >/dev/null 2>&1; then
-          echo "Stack exists, checking for drift..."
+        STACK_STATUS=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_EXISTS")
+        
+        if [ "$STACK_STATUS" != "NOT_EXISTS" ] && [ "$STACK_STATUS" != "DELETE_COMPLETE" ]; then
+          echo "Stack exists in status: $STACK_STATUS, checking for drift..."
           
           # Start drift detection
           DRIFT_ID=$(aws cloudformation detect-stack-drift --stack-name ${{ env.STACK_NAME }} --query 'StackDriftDetectionId' --output text)
@@ -148,7 +150,7 @@ jobs:
             echo "⏱️  Drift detection timed out after 5 minutes, continuing deployment..."
           fi
         else
-          echo "Stack doesn't exist, will create new stack"
+          echo "Stack doesn't exist or is deleted (status: $STACK_STATUS), will create new stack"
         fi
 
     - name: Create CloudFormation changeset
