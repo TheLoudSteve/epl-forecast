@@ -109,7 +109,7 @@ jobs:
         
         STACK_STATUS=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_EXISTS")
         
-        if [ "$STACK_STATUS" != "NOT_EXISTS" ] && [ "$STACK_STATUS" != "DELETE_COMPLETE" ]; then
+        if [ "$STACK_STATUS" != "NOT_EXISTS" ] && [ "$STACK_STATUS" != "DELETE_COMPLETE" ] && [ "$STACK_STATUS" != "ROLLBACK_COMPLETE" ]; then
           echo "Stack exists in status: $STACK_STATUS, checking for drift..."
           
           # Start drift detection
