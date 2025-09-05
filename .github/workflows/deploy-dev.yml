@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
 
 env:
-  AWS_REGION: us-east-1
+  AWS_REGION: ${{ secrets.AWS_REGION_DEV }}
   ENVIRONMENT: dev
-  STACK_NAME: epl-forecast-dev
+  STACK_NAME: epl-forecast-dev-west2
 
 jobs:
   validate:
