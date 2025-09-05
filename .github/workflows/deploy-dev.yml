@@ -55,9 +55,6 @@ jobs:
           MISSING_PARAMS="$MISSING_PARAMS NewRelicLicenseKey"
         fi
         
-        if [ -z "${{ secrets.NEW_RELIC_INGEST_KEY }}" ]; then
-          MISSING_PARAMS="$MISSING_PARAMS NewRelicIngestKey"
-        fi
         
         if [ -n "$MISSING_PARAMS" ]; then
           echo "❌ Missing required parameters: $MISSING_PARAMS"
@@ -170,8 +167,7 @@ jobs:
             ParameterKey=RapidAPIKey,ParameterValue=${{ secrets.RAPIDAPI_KEY }} \
             ParameterKey=NewRelicAccountId,ParameterValue=${{ secrets.NEW_RELIC_ACCOUNT_ID }} \
             ParameterKey=NewRelicLicenseKey,ParameterValue=${{ secrets.NEW_RELIC_LICENSE_KEY }} \
-            ParameterKey=NewRelicIngestKey,ParameterValue=${{ secrets.NEW_RELIC_INGEST_KEY }} \
-            ParameterKey=APNSCertificateArn,ParameterValue= \
+            ParameterKey=APNSPlatformApplicationArn,ParameterValue= \
           --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
           --change-set-type UPDATE 2>/dev/null
         
@@ -193,8 +189,7 @@ jobs:
               ParameterKey=RapidAPIKey,ParameterValue=${{ secrets.RAPIDAPI_KEY }} \
               ParameterKey=NewRelicAccountId,ParameterValue=${{ secrets.NEW_RELIC_ACCOUNT_ID }} \
               ParameterKey=NewRelicLicenseKey,ParameterValue=${{ secrets.NEW_RELIC_LICENSE_KEY }} \
-              ParameterKey=NewRelicIngestKey,ParameterValue=${{ secrets.NEW_RELIC_INGEST_KEY }} \
-              ParameterKey=APNSCertificateArn,ParameterValue= \
+              ParameterKey=APNSPlatformApplicationArn,ParameterValue= \
             --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
             --change-set-type CREATE
           
