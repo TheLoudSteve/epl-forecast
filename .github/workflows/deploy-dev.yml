@@ -478,9 +478,25 @@ jobs:
         
         # Test API handler
         echo "Testing API handler..."
+        
+        # Create API Gateway event payload
+        cat > /tmp/api_event.json << 'EOF'
+        {
+          "httpMethod": "GET",
+          "path": "/health",
+          "pathParameters": null,
+          "queryStringParameters": null,
+          "headers": {
+            "Accept": "application/json"
+          },
+          "body": null,
+          "isBase64Encoded": false
+        }
+        EOF
+        
         aws lambda invoke \
           --function-name epl-api-handler-${{ env.ENVIRONMENT }} \
-          --payload '{"httpMethod": "GET", "path": "/health"}' \
+          --payload fileb:///tmp/api_event.json \
           /tmp/api_response.json
         
         if grep -q "statusCode.*200" /tmp/api_response.json; then
