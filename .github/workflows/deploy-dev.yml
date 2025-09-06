@@ -203,10 +203,13 @@ jobs:
         echo "Total changes: $CHANGE_COUNT"
         
         if [ "$CHANGE_COUNT" = "0" ]; then
-          echo "⚠️  No changes detected - this may indicate a problem"
+          echo "✅ No changes needed - stack is already up-to-date"
           echo "Deleting empty changeset..."
           aws cloudformation delete-change-set --stack-name ${{ env.STACK_NAME }} --change-set-name $CHANGESET_NAME
-          exit 1
+          echo "changeset-created=false" >> $GITHUB_OUTPUT
+          echo "stack-already-updated=true" >> $GITHUB_OUTPUT
+        else
+          echo "Changes to be applied: $CHANGE_COUNT"
         fi
 
     - name: Execute changeset
@@ -235,7 +238,6 @@ jobs:
         echo "✅ Stack update completed successfully"
 
     - name: Deploy API Gateway changes
-      if: steps.changeset.outputs.changeset-created == 'true'
       run: |
         echo "Deploying API Gateway changes to ensure endpoints are available..."
         
@@ -263,7 +265,7 @@ jobs:
   verify-deployment:
     needs: deploy-infrastructure
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && needs.deploy-infrastructure.outputs.changeset-created == 'true'
+    if: github.ref == 'refs/heads/main'
     
     steps:
     - uses: actions/checkout@v4
