@@ -172,7 +172,7 @@ jobs:
         TEST_CHANGESET_NAME="test-changeset-$(date +%s)"
         
         aws cloudformation create-change-set \
-          --stack-name test-parameter-validation \
+          --stack-name epl-forecast-dev-test \
           --change-set-name $TEST_CHANGESET_NAME \
           --template-body file://test-template.yaml \
           --parameters \
@@ -190,7 +190,7 @@ jobs:
         echo "✅ Test changeset created successfully - parameters are valid"
         
         # Clean up test changeset
-        aws cloudformation delete-change-set --stack-name test-parameter-validation --change-set-name $TEST_CHANGESET_NAME --region ${{ env.AWS_REGION }} || true
+        aws cloudformation delete-change-set --stack-name epl-forecast-dev-test --change-set-name $TEST_CHANGESET_NAME --region ${{ env.AWS_REGION }} || true
         
         set +e  # Don't exit on error
         aws cloudformation create-change-set \
