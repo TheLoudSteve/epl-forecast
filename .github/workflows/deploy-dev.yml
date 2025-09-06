@@ -286,7 +286,7 @@ jobs:
         fi
 
   verify-deployment:
-    needs: deploy-infrastructure
+    needs: deploy-lambda
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     
@@ -394,7 +394,7 @@ jobs:
         echo "✅ API verification completed"
 
   deploy-lambda:
-    needs: verify-deployment
+    needs: deploy-infrastructure
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     
