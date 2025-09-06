@@ -10,7 +10,7 @@ on:
 env:
   AWS_REGION: ${{ secrets.AWS_REGION_DEV }}
   ENVIRONMENT: dev
-  STACK_NAME: epl-forecast-dev-west2
+  STACK_NAME: epl-forecast-dev-usw2
 
 jobs:
   validate:
