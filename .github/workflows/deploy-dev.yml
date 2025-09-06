@@ -183,22 +183,43 @@ jobs:
       if: steps.changeset.outputs.changeset-created == 'true'
       run: |
         CHANGESET_NAME="${{ steps.changeset.outputs.changeset-id }}"
-        echo "Waiting for changeset to be created..."
+        echo "Checking changeset status..."
         
-        # Wait for changeset creation
-        aws cloudformation wait change-set-create-complete \
-          --stack-name ${{ env.STACK_NAME }} \
-          --change-set-name $CHANGESET_NAME
+        # Wait a moment for changeset to be processed
+        sleep 5
         
-        echo "Changeset contents:"
-        aws cloudformation describe-change-set \
-          --stack-name ${{ env.STACK_NAME }} \
-          --change-set-name $CHANGESET_NAME \
-          --query 'Changes[*].[Action,ResourceChange.LogicalResourceId,ResourceChange.ResourceType,ResourceChange.Replacement]' \
-          --output table
+        # Check changeset status - handle both success and no-changes failure
+        CHANGESET_STATUS=$(aws cloudformation describe-change-set --stack-name ${{ env.STACK_NAME }} --change-set-name $CHANGESET_NAME --query 'Status' --output text 2>/dev/null || echo "NOT_FOUND")
+        echo "Changeset status: $CHANGESET_STATUS"
         
-        # Count changes
-        CHANGE_COUNT=$(aws cloudformation describe-change-set --stack-name ${{ env.STACK_NAME }} --change-set-name $CHANGESET_NAME --query 'length(Changes)' --output text)
+        if [ "$CHANGESET_STATUS" = "CREATE_COMPLETE" ]; then
+          echo "Changeset created successfully"
+          
+          echo "Changeset contents:"
+          aws cloudformation describe-change-set \
+            --stack-name ${{ env.STACK_NAME }} \
+            --change-set-name $CHANGESET_NAME \
+            --query 'Changes[*].[Action,ResourceChange.LogicalResourceId,ResourceChange.ResourceType,ResourceChange.Replacement]' \
+            --output table
+          
+          # Count changes
+          CHANGE_COUNT=$(aws cloudformation describe-change-set --stack-name ${{ env.STACK_NAME }} --change-set-name $CHANGESET_NAME --query 'length(Changes)' --output text)
+        elif [ "$CHANGESET_STATUS" = "FAILED" ]; then
+          # Check if failure is due to no changes
+          STATUS_REASON=$(aws cloudformation describe-change-set --stack-name ${{ env.STACK_NAME }} --change-set-name $CHANGESET_NAME --query 'StatusReason' --output text 2>/dev/null || echo "")
+          echo "Changeset failure reason: $STATUS_REASON"
+          
+          if [[ "$STATUS_REASON" == *"didn't contain changes"* ]] || [[ "$STATUS_REASON" == *"no changes"* ]]; then
+            echo "✅ No changes needed - stack is already up-to-date"
+            CHANGE_COUNT="0"
+          else
+            echo "❌ Changeset failed for other reason: $STATUS_REASON"
+            exit 1
+          fi
+        else
+          echo "❌ Unexpected changeset status: $CHANGESET_STATUS"
+          exit 1
+        fi
         
         echo "Total changes: $CHANGE_COUNT"
         
