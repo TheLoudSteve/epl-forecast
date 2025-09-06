@@ -103,54 +103,17 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
         aws-region: ${{ env.AWS_REGION }}
     
-    - name: Check for stack drift (optional)
+    - name: Check stack status
       run: |
-        echo "Checking for stack drift with timeout..."
+        echo "Checking stack status..."
         
         STACK_STATUS=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_EXISTS")
+        echo "Stack status: $STACK_STATUS"
         
         if [ "$STACK_STATUS" != "NOT_EXISTS" ] && [ "$STACK_STATUS" != "DELETE_COMPLETE" ] && [ "$STACK_STATUS" != "ROLLBACK_COMPLETE" ]; then
-          echo "Stack exists in status: $STACK_STATUS, checking for drift..."
-          
-          # Start drift detection
-          DRIFT_ID=$(aws cloudformation detect-stack-drift --stack-name ${{ env.STACK_NAME }} --query 'StackDriftDetectionId' --output text)
-          
-          # Wait for drift detection to complete with timeout
-          echo "Waiting for drift detection to complete (max 5 minutes)..."
-          TIMEOUT=300  # 5 minutes
-          ELAPSED=0
-          
-          while [ $ELAPSED -lt $TIMEOUT ]; do
-            STATUS=$(aws cloudformation describe-stack-drift-detection-status --stack-drift-detection-id $DRIFT_ID --query 'DetectionStatus' --output text 2>/dev/null || echo "FAILED")
-            if [ "$STATUS" = "DETECTION_COMPLETE" ]; then
-              echo "✅ Drift detection completed"
-              
-              # Get drift status
-              DRIFT_STATUS=$(aws cloudformation describe-stack-drift-detection-status --stack-drift-detection-id $DRIFT_ID --query 'StackDriftStatus' --output text)
-              echo "Stack drift status: $DRIFT_STATUS"
-              
-              if [ "$DRIFT_STATUS" = "DRIFTED" ]; then
-                echo "⚠️  Stack has drifted from template"
-                aws cloudformation describe-stack-resource-drifts --stack-name ${{ env.STACK_NAME }} --query 'StackResourceDrifts[?StackResourceDriftStatus==`MODIFIED`].[LogicalResourceId,ResourceType,StackResourceDriftStatus]' --output table || true
-              else
-                echo "✅ Stack is in sync with template"
-              fi
-              break
-            elif [ "$STATUS" = "DETECTION_FAILED" ]; then
-              echo "❌ Drift detection failed, continuing anyway..."
-              break
-            else
-              echo "Current status: $STATUS, waiting... (${ELAPSED}s/${TIMEOUT}s)"
-              sleep 10
-              ELAPSED=$((ELAPSED + 10))
-            fi
-          done
-          
-          if [ $ELAPSED -ge $TIMEOUT ]; then
-            echo "⏱️  Drift detection timed out after 5 minutes, continuing deployment..."
-          fi
+          echo "✅ Stack exists - will attempt UPDATE changeset"
         else
-          echo "Stack doesn't exist or is deleted (status: $STACK_STATUS), will create new stack"
+          echo "✅ Stack doesn't exist - will attempt CREATE changeset"
         fi
 
     - name: Create CloudFormation changeset
@@ -158,39 +121,6 @@ jobs:
       run: |
         CHANGESET_NAME="changeset-$(date +%s)"
         echo "Creating changeset: $CHANGESET_NAME"
-        
-        # Test parameter validation with simple template
-        echo "Testing parameter validation with simple template..."
-        TEST_RESULT=$(aws cloudformation validate-template --template-body file://test-template.yaml 2>&1) || {
-          echo "❌ Test template validation failed: $TEST_RESULT"
-          exit 1
-        }
-        echo "✅ Test template is valid"
-        
-        # Try creating a test changeset to isolate the parameter issue
-        echo "Testing changeset creation with real parameter values..."
-        TEST_CHANGESET_NAME="test-changeset-$(date +%s)"
-        
-        aws cloudformation create-change-set \
-          --stack-name epl-forecast-dev-test \
-          --change-set-name $TEST_CHANGESET_NAME \
-          --template-body file://test-template.yaml \
-          --parameters \
-            ParameterKey=Environment,ParameterValue=dev \
-            ParameterKey=RapidAPIKey,ParameterValue="${{ secrets.RAPIDAPI_KEY }}" \
-            ParameterKey=NewRelicAccountId,ParameterValue="${{ secrets.NEW_RELIC_ACCOUNT_ID }}" \
-            ParameterKey=NewRelicLicenseKey,ParameterValue="${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
-          --change-set-type CREATE \
-          --region ${{ env.AWS_REGION }} 2>&1 || {
-          echo "❌ Test changeset creation failed with real parameters"
-          echo "This indicates an issue with one of the GitHub secret values"
-          exit 1
-        }
-        
-        echo "✅ Test changeset created successfully - parameters are valid"
-        
-        # Clean up test changeset
-        aws cloudformation delete-change-set --stack-name epl-forecast-dev-test --change-set-name $TEST_CHANGESET_NAME --region ${{ env.AWS_REGION }} || true
         
         set +e  # Don't exit on error
         aws cloudformation create-change-set \
