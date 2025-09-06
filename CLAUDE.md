@@ -32,25 +32,18 @@ EPL Forecast is an iOS app with AWS backend that provides English Premier League
 ## AWS Account Configuration
 
 ### Environments
-- **Dev Account**: 738138308534 (us-east-1)
+- **Dev Account**: 738138308534 (us-west-2)
   - Profile: `eplprofile-dev`  
-  - Stack: `epl-forecast-dev`
+  - Stack: `epl-forecast-dev-usw2`
+  - **Note**: Migrated from us-east-1 to us-west-2 (EPLF-22 completed)
 - **Prod Account**: 832199678722 (us-west-2)
   - Profile: `eplprofile-prd`
   - Stack: `epl-forecast-prod`
 
 ### Key Infrastructure
 - **CloudFormation Template**: `infrastructure/step6.yaml`
-- **Dev API**: https://1e4u1ghr3i.execute-api.us-east-1.amazonaws.com/dev
-- **Prod API**: TBD (deployed via GitHub Actions)
-
-## Lambda Function Architecture Changes (Recent)
-
-### Previous Architecture (Problem)
-- Single `data_fetcher.py` function
-- EventBridge triggered every 2 minutes in prod
-- Faulty time logic caused 30 RapidAPI calls/hour (should have been 2/day)
-- Cost: ~720 calls/day vs expected 2-4 calls/day
+- **Dev API**: https://h24g9rmkz2.execute-api.us-west-2.amazonaws.com/dev
+- **Prod API**: https://aiighxj72l.execute-api.us-west-2.amazonaws.com/prod
 
 ### New Architecture (Current)
 - **scheduled_data_fetcher.py**: 
@@ -126,8 +119,8 @@ aws lambda invoke --function-name epl-scheduled-fetcher-dev --payload '{}' respo
 aws lambda invoke --function-name epl-live-fetcher-prod --payload '{}' response.json
 
 # Test API handler
-curl https://1e4u1ghr3i.execute-api.us-east-1.amazonaws.com/dev/health
-curl https://1e4u1ghr3i.execute-api.us-east-1.amazonaws.com/dev/table
+curl https://h24g9rmkz2.execute-api.us-west-2.amazonaws.com/dev/health
+curl https://h24g9rmkz2.execute-api.us-west-2.amazonaws.com/dev/table
 ```
 
 ### GitHub Actions
@@ -141,34 +134,6 @@ gh run list --limit 5
 # View failed run logs
 gh run view <run-id> --log-failed
 ```
-
-## Key Dates & Context
-
-### App Store Rejection (August 2024)
-- **Issue**: "Unable to load data" on iPad Air 5th generation, iPadOS 18.6.2
-- **Root Cause**: Backend data not available due to Lambda scheduling issues
-- **Resolution**: Complete backend architecture overhaul + monitoring
-
-### Infrastructure Evolution
-1. **Initial**: Simple Lambda + API Gateway
-2. **v1.0**: Added DynamoDB caching + S3 fixture storage
-3. **v1.1**: Fixed region mismatch issues (us-east-1 vs us-west-2)  
-4. **v1.2**: Added New Relic monitoring (iOS + Lambda)
-5. **v1.3**: Split into scheduled vs live match functions
-6. **v1.4**: Added CloudWatch Metric Streams integration
-
-## Known Issues & Solutions
-
-### Previous Issues (Resolved)
-- ✅ **Lambda time logic bug**: Fixed with separate function architecture
-- ✅ **New Relic layer permissions**: Switched to SDK-based approach
-- ✅ **Region mismatch**: Fixed CloudFormation region parameters
-- ✅ **Excessive RapidAPI calls**: New architecture limits to match windows only
-
-### Current Monitoring Gaps
-- ⏳ **API Gateway detailed metrics**: Need v1 polling integration for resource-level data
-- ⏳ **New Relic alerts**: Need error rate and performance thresholds  
-- ⏳ **Cost dashboards**: RapidAPI usage tracking and alerting
 
 ## File Structure
 
@@ -188,15 +153,32 @@ epl-forecast/
     └── deploy-prod.yml
 ```
 
-## Next Steps / TODO
+## Issue Tracking & Project Management
 
-See active todo list via TodoWrite tool. Key remaining items:
-- Test new function architecture end-to-end
-- Set up New Relic dashboards for monitoring
-- Configure alerts for critical errors
-- Validate RapidAPI usage reduction
+### Atlassian Integration
+- **Jira Instance**: https://loudsteve.atlassian.net
+- **Project**: EPLF (EPL Forecast)
+- **Claude Code MCP**: Atlassian MCP available for Jira/Confluence operations
 
----
+### Issue Workflow & Status Management
+**IMPORTANT**: Claude should NEVER mark tickets as "Done" - only humans should do final completion.
 
-**Last Updated**: August 27, 2025
-**Current Session Context**: New Relic CloudWatch Metric Streams deployments in progress
+#### Status Transitions:
+1. **To Do** → **In Progress**: Claude moves ticket when starting work
+2. **In Progress** → **In Review**: Claude moves ticket when implementation complete  
+3. **In Review** → **Done**: HUMAN ONLY - after review/testing/approval
+
+#### Claude Responsibilities:
+- Search and read Jira issues (EPLF-XX format)
+- Move tickets to "In Progress" when starting work
+- Move tickets to "In Review" when code changes complete
+- Add detailed comments explaining implementation and changes
+- Reference specific files and line numbers in comments
+
+#### Human Responsibilities:
+- Final review of implementation
+- Testing and validation
+- Moving tickets from "In Review" to "Done"
+- Creating new tickets and setting priorities
+
+This ensures proper accountability and prevents premature closure of issues before human validation.
