@@ -223,6 +223,15 @@ jobs:
             echo "changeset-id=$CHANGESET_NAME" >> $GITHUB_OUTPUT
           else
             echo "Both UPDATE and CREATE changeset creation failed"
+            echo "Attempting to capture changeset failure reason..."
+            
+            # Try to find any failed changesets
+            aws cloudformation list-change-sets --stack-name ${{ env.STACK_NAME }} --region ${{ env.AWS_REGION }} || true
+            
+            # Try to get stack events for more details
+            echo "Stack events:"
+            aws cloudformation describe-stack-events --stack-name ${{ env.STACK_NAME }} --region ${{ env.AWS_REGION }} --max-items 5 --query 'StackEvents[*].[Timestamp,LogicalResourceId,ResourceStatus,ResourceStatusReason]' --output table || true
+            
             echo "changeset-created=false" >> $GITHUB_OUTPUT
             exit 1
           fi
