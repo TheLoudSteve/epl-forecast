@@ -182,7 +182,7 @@ jobs:
         else
           # Try creating stack if it doesn't exist
           echo "Trying to create new stack..."
-          aws cloudformation create-change-set \
+          if aws cloudformation create-change-set \
             --stack-name ${{ env.STACK_NAME }} \
             --change-set-name $CHANGESET_NAME \
             --template-body file://infrastructure/step6.yaml \
@@ -193,10 +193,16 @@ jobs:
               ParameterKey=NewRelicLicenseKey,ParameterValue=${{ secrets.NEW_RELIC_LICENSE_KEY }} \
               ParameterKey=APNSPlatformApplicationArn,ParameterValue= \
             --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-            --change-set-type CREATE
-          
-          echo "changeset-created=true" >> $GITHUB_OUTPUT
-          echo "changeset-id=$CHANGESET_NAME" >> $GITHUB_OUTPUT
+            --change-set-type CREATE; then
+            
+            echo "Create changeset succeeded"
+            echo "changeset-created=true" >> $GITHUB_OUTPUT
+            echo "changeset-id=$CHANGESET_NAME" >> $GITHUB_OUTPUT
+          else
+            echo "Both UPDATE and CREATE changeset creation failed"
+            echo "changeset-created=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
         fi
         
         set -e
