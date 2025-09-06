@@ -247,8 +247,18 @@ jobs:
           --stack-name ${{ env.STACK_NAME }} \
           --change-set-name $CHANGESET_NAME
         
-        echo "Waiting for stack update to complete..."
-        aws cloudformation wait stack-update-complete --stack-name ${{ env.STACK_NAME }}
+        echo "Waiting for stack operation to complete (max 20 minutes)..."
+        
+        # Check if this is a create or update operation
+        STACK_STATUS=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NOT_FOUND")
+        
+        if [[ "$STACK_STATUS" == "CREATE_IN_PROGRESS" ]]; then
+          echo "Stack creation in progress..."
+          timeout 1200 aws cloudformation wait stack-create-complete --stack-name ${{ env.STACK_NAME }}
+        else
+          echo "Stack update in progress..."
+          timeout 1200 aws cloudformation wait stack-update-complete --stack-name ${{ env.STACK_NAME }}
+        fi
         
         echo "✅ Stack update completed successfully"
 
