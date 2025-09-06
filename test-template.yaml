@@ -1,0 +1,36 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Test template to validate parameters'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+  RapidAPIKey:
+    Type: String
+    NoEcho: true
+  NewRelicAccountId:
+    Type: String
+    Default: ""
+  NewRelicLicenseKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+
+Resources:
+  # Simple S3 bucket to test parameter validation
+  TestBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'epl-test-${Environment}-${AWS::AccountId}'
+      Tags:
+        - Key: RapidAPIKeyLength
+          Value: !Sub '${RapidAPIKey}'
+        - Key: NewRelicAccount
+          Value: !Ref NewRelicAccountId
+        - Key: Environment
+          Value: !Ref Environment
+
+Outputs:
+  BucketName:
+    Value: !Ref TestBucket
+    Description: Test bucket name

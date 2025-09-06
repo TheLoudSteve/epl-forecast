@@ -159,28 +159,38 @@ jobs:
         CHANGESET_NAME="changeset-$(date +%s)"
         echo "Creating changeset: $CHANGESET_NAME"
         
-        # Validate required parameters (without exposing values)
-        echo "Validating parameters..."
-        if [ -z "${{ secrets.RAPIDAPI_KEY }}" ]; then
-          echo "❌ RAPIDAPI_KEY is empty"
+        # Test parameter validation with simple template
+        echo "Testing parameter validation with simple template..."
+        TEST_RESULT=$(aws cloudformation validate-template --template-body file://test-template.yaml 2>&1) || {
+          echo "❌ Test template validation failed: $TEST_RESULT"
           exit 1
-        else
-          echo "✅ RAPIDAPI_KEY is set"
-        fi
+        }
+        echo "✅ Test template is valid"
         
-        if [ -z "${{ secrets.NEW_RELIC_ACCOUNT_ID }}" ]; then
-          echo "❌ NEW_RELIC_ACCOUNT_ID is empty"
-          exit 1
-        else
-          echo "✅ NEW_RELIC_ACCOUNT_ID is set: ${{ secrets.NEW_RELIC_ACCOUNT_ID }}"
-        fi
+        # Try creating a test changeset to isolate the parameter issue
+        echo "Testing changeset creation with real parameter values..."
+        TEST_CHANGESET_NAME="test-changeset-$(date +%s)"
         
-        if [ -z "${{ secrets.NEW_RELIC_LICENSE_KEY }}" ]; then
-          echo "❌ NEW_RELIC_LICENSE_KEY is empty"
+        aws cloudformation create-change-set \
+          --stack-name test-parameter-validation \
+          --change-set-name $TEST_CHANGESET_NAME \
+          --template-body file://test-template.yaml \
+          --parameters \
+            ParameterKey=Environment,ParameterValue=dev \
+            ParameterKey=RapidAPIKey,ParameterValue="${{ secrets.RAPIDAPI_KEY }}" \
+            ParameterKey=NewRelicAccountId,ParameterValue="${{ secrets.NEW_RELIC_ACCOUNT_ID }}" \
+            ParameterKey=NewRelicLicenseKey,ParameterValue="${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
+          --change-set-type CREATE \
+          --region ${{ env.AWS_REGION }} 2>&1 || {
+          echo "❌ Test changeset creation failed with real parameters"
+          echo "This indicates an issue with one of the GitHub secret values"
           exit 1
-        else
-          echo "✅ NEW_RELIC_LICENSE_KEY is set"
-        fi
+        }
+        
+        echo "✅ Test changeset created successfully - parameters are valid"
+        
+        # Clean up test changeset
+        aws cloudformation delete-change-set --stack-name test-parameter-validation --change-set-name $TEST_CHANGESET_NAME --region ${{ env.AWS_REGION }} || true
         
         set +e  # Don't exit on error
         aws cloudformation create-change-set \
