@@ -159,6 +159,29 @@ jobs:
         CHANGESET_NAME="changeset-$(date +%s)"
         echo "Creating changeset: $CHANGESET_NAME"
         
+        # Validate required parameters (without exposing values)
+        echo "Validating parameters..."
+        if [ -z "${{ secrets.RAPIDAPI_KEY }}" ]; then
+          echo "❌ RAPIDAPI_KEY is empty"
+          exit 1
+        else
+          echo "✅ RAPIDAPI_KEY is set (length: ${#{{ secrets.RAPIDAPI_KEY }}})"
+        fi
+        
+        if [ -z "${{ secrets.NEW_RELIC_ACCOUNT_ID }}" ]; then
+          echo "❌ NEW_RELIC_ACCOUNT_ID is empty"
+          exit 1
+        else
+          echo "✅ NEW_RELIC_ACCOUNT_ID is set: ${{ secrets.NEW_RELIC_ACCOUNT_ID }}"
+        fi
+        
+        if [ -z "${{ secrets.NEW_RELIC_LICENSE_KEY }}" ]; then
+          echo "❌ NEW_RELIC_LICENSE_KEY is empty"
+          exit 1
+        else
+          echo "✅ NEW_RELIC_LICENSE_KEY is set (length: ${#{{ secrets.NEW_RELIC_LICENSE_KEY }}})"
+        fi
+        
         set +e  # Don't exit on error
         aws cloudformation create-change-set \
           --stack-name ${{ env.STACK_NAME }} \
