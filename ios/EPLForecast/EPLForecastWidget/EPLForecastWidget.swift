@@ -1,6 +1,38 @@
 import WidgetKit
 import SwiftUI
 
+// Team structure matching the main app's Team model
+struct Team: Codable, Identifiable {
+    let name: String
+    let played: Int
+    let won: Int
+    let drawn: Int
+    let lost: Int
+    let goalsFor: Int
+    let against: Int
+    let goalDifference: Int
+    let points: Int
+    let pointsPerGame: Double
+    let forecastedPoints: Double
+    let currentPosition: Int
+    let forecastedPosition: Int
+    
+    // Computed property for Identifiable
+    var id: String { name }
+    
+    private enum CodingKeys: String, CodingKey {
+        case name, played, won, drawn, lost
+        case goalsFor = "for"
+        case against
+        case goalDifference = "goal_difference"
+        case points
+        case pointsPerGame = "points_per_game"
+        case forecastedPoints = "forecasted_points"
+        case currentPosition = "current_position"
+        case forecastedPosition = "forecasted_position"
+    }
+}
+
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> TeamEntry {
         TeamEntry(date: Date(), team: sampleTeam())
@@ -33,7 +65,7 @@ struct Provider: TimelineProvider {
         if let favoriteTeam = SharedDataManager.shared.getFavoriteTeamData() {
             let widgetTeam = WidgetTeam(
                 name: favoriteTeam.name,
-                position: Int(favoriteTeam.forecastedPosition),
+                position: favoriteTeam.forecastedPosition,
                 points: favoriteTeam.forecastedPoints,
                 primaryColor: teamPrimaryColor(for: favoriteTeam.name),
                 backgroundColor: teamPrimaryColor(for: favoriteTeam.name).opacity(0.15),
@@ -49,24 +81,38 @@ struct Provider: TimelineProvider {
             return
         }
         
-        // Show "collecting data" state and fetch from API
-        let collectingEntry = TeamEntry(date: Date(), team: collectingDataWidget())
-        entries.append(collectingEntry)
-        
+        // Try to fetch fresh data from API
         Task {
             do {
-                _ = try await fetchFavoriteTeamData()
-                // Don't add to entries here - the next timeline refresh will show loaded data
+                let fetchedTeam = try await fetchFavoriteTeamData()
+                
+                let entry = TeamEntry(date: Date(), team: fetchedTeam)
+                entries.append(entry)
+                
+                // Update every 30 minutes after successful fetch
+                let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: Date())!
+                let timeline = Timeline(entries: entries, policy: .after(nextUpdate))
+                completion(timeline)
             } catch {
                 print("Failed to fetch team data: \(error)")
-                // Continue showing "collecting data" state
+                // Show error state instead of indefinite "collecting data"
+                let errorTeam = WidgetTeam(
+                    name: "Unable to load data",
+                    position: nil,
+                    points: nil,
+                    primaryColor: .secondary,
+                    backgroundColor: Color.red.opacity(0.1),
+                    state: .error
+                )
+                let entry = TeamEntry(date: Date(), team: errorTeam)
+                entries.append(entry)
+                
+                // Retry in 5 minutes on error
+                let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: Date())!
+                let timeline = Timeline(entries: entries, policy: .after(nextUpdate))
+                completion(timeline)
             }
         }
-        
-        // Retry in 2 minutes to check for data
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 2, to: Date())!
-        let timeline = Timeline(entries: entries, policy: .after(nextUpdate))
-        completion(timeline)
     }
 }
 
@@ -386,12 +432,17 @@ func collectingDataWidget() -> WidgetTeam {
 
 func fetchFavoriteTeamData() async throws -> WidgetTeam {
     // Use the same API endpoint as the main app
-    guard let url = URL(string: "https://1e4u1ghr3i.execute-api.us-east-1.amazonaws.com/dev/table") else {
+    guard let url = URL(string: "https://aiighxj72l.execute-api.us-west-2.amazonaws.com/prod/table") else {
         throw URLError(.badURL)
     }
     
     let (data, _) = try await URLSession.shared.data(from: url)
     let apiResponse = try JSONDecoder().decode(APIResponse.self, from: data)
+    
+    // Cache the raw team data for future use
+    if let teamData = try? JSONEncoder().encode(apiResponse.forecastTable) {
+        SharedDataManager.shared.cacheTeamData(teamData)
+    }
     
     // Get favorite team from shared data
     let favoriteTeam = SharedDataManager.shared.favoriteTeam
@@ -403,7 +454,7 @@ func fetchFavoriteTeamData() async throws -> WidgetTeam {
     
     return WidgetTeam(
         name: selectedTeam.name,
-        position: Int(selectedTeam.forecastedPosition),
+        position: selectedTeam.forecastedPosition,
         points: selectedTeam.forecastedPoints,
         primaryColor: teamPrimaryColor(for: selectedTeam.name),
         backgroundColor: teamPrimaryColor(for: selectedTeam.name).opacity(0.15),
@@ -412,7 +463,7 @@ func fetchFavoriteTeamData() async throws -> WidgetTeam {
 }
 
 struct APIResponse: Codable {
-    let forecastTable: [APITeam]
+    let forecastTable: [Team]
     let metadata: APIMetadata
     
     enum CodingKeys: String, CodingKey {
@@ -421,27 +472,9 @@ struct APIResponse: Codable {
     }
 }
 
-struct APITeam: Codable {
-    let name: String
-    let forecastedPosition: Double
-    let forecastedPoints: Double
-    let played: Double
-    let points: Double
-    let pointsPerGame: Double
-    
-    enum CodingKeys: String, CodingKey {
-        case name
-        case forecastedPosition = "forecasted_position"
-        case forecastedPoints = "forecasted_points"
-        case played
-        case points
-        case pointsPerGame = "points_per_game"
-    }
-}
-
 struct APIMetadata: Codable {
     let lastUpdated: String
-    let totalTeams: Double
+    let totalTeams: Int
     let apiVersion: String
     let description: String
     

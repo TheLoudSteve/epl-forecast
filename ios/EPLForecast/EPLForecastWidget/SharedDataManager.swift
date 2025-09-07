@@ -74,15 +74,15 @@ class SharedDataManager {
             return nil
         }
         
-        // Check if cache is less than 30 minutes old
-        if Date().timeIntervalSince(cacheTimestamp) > 30 * 60 {
+        // Check if cache is less than 4 hours old
+        if Date().timeIntervalSince(cacheTimestamp) > 4 * 60 * 60 {
             return nil
         }
         
         return data
     }
     
-    func getFavoriteTeamData() -> APITeam? {
+    func getFavoriteTeamData() -> Team? {
         guard let favoriteTeam = favoriteTeam,
               let cachedData = getCachedTeamData() else {
             return nil
@@ -90,7 +90,7 @@ class SharedDataManager {
         
         do {
             let decoder = JSONDecoder()
-            let teams = try decoder.decode([APITeam].self, from: cachedData)
+            let teams = try decoder.decode([Team].self, from: cachedData)
             
             return teams.first { team in
                 team.name.lowercased().contains(favoriteTeam.lowercased())
