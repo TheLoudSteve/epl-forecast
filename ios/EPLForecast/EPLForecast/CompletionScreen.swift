@@ -180,7 +180,7 @@ struct FeatureSummaryRow: View {
 
 #Preview {
     CompletionScreen(
-        selectedTeam: "Arsenal",
+        selectedTeam: "Millfield Rangers",
         onFinish: { print("Finish") }
     )
 }

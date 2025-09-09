@@ -107,7 +107,7 @@ struct WidgetFeatureView: View {
                         .font(.system(size: 32, weight: .bold, design: .rounded))
                         .foregroundColor(.red)
                     
-                    Text("Arsenal")
+                    Text("Millfield Rangers")
                         .font(.headline)
                         .fontWeight(.semibold)
                         .foregroundColor(.red)
@@ -172,7 +172,7 @@ struct NotificationFeatureView: View {
                             .font(.caption)
                             .fontWeight(.semibold)
                         
-                        Text("Arsenal's forecast position improved!")
+                        Text("Millfield Rangers' forecast position improved!")
                             .font(.subheadline)
                             .fontWeight(.medium)
                     }
@@ -222,7 +222,7 @@ struct InsightsFeatureView: View {
                         Circle()
                             .fill(Color.red)
                             .frame(width: 8, height: 8)
-                        Text("Arsenal")
+                        Text("Millfield Rangers")
                             .font(.headline)
                             .fontWeight(.semibold)
                             .foregroundColor(.red)

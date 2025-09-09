@@ -177,21 +177,21 @@ struct ForecastExplanationScreen: View {
         if showPrediction {
             // Predicted final table
             switch index {
-            case 0: return (1, "Arsenal", 89, true)
-            case 1: return (2, "Man City", 87, true)
-            case 2: return (3, "Liverpool", 82, false)
-            case 3: return (4, "Newcastle", 68, true)
-            case 4: return (5, "Chelsea", 65, false)
+            case 0: return (1, "Millfield Rangers", 89, true)
+            case 1: return (2, "Cromwell City", 87, true)
+            case 2: return (3, "Thornbury FC", 82, false)
+            case 3: return (4, "Redwood City", 68, true)
+            case 4: return (5, "Whitmore United", 65, false)
             default: return (1, "", 0, false)
             }
         } else {
             // Current table
             switch index {
-            case 0: return (1, "Man City", 63, true)
-            case 1: return (2, "Arsenal", 61, true)
-            case 2: return (3, "Liverpool", 59, false)
-            case 3: return (4, "Chelsea", 47, false)
-            case 4: return (5, "Newcastle", 44, true)
+            case 0: return (1, "Cromwell City", 63, true)
+            case 1: return (2, "Millfield Rangers", 61, true)
+            case 2: return (3, "Thornbury FC", 59, false)
+            case 3: return (4, "Whitmore United", 47, false)
+            case 4: return (5, "Redwood City", 44, true)
             default: return (1, "", 0, false)
             }
         }
