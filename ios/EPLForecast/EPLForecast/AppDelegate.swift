@@ -38,6 +38,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         
         #if targetEnvironment(simulator)
         print("Running in simulator - some New Relic features disabled to avoid CoreTelephony warnings")
+        print("Note: CoreTelephony XPC warnings in simulator are expected and harmless")
         #endif
         
         // Record app launch event

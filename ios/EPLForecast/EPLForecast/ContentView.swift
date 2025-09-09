@@ -8,7 +8,7 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             TableView(shouldResetScroll: $shouldResetScroll)
-                .navigationTitle("Premier League Forecast")
+                .navigationTitle("English League Forecast")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
@@ -30,7 +30,7 @@ struct ContentView: View {
             }
         }
         .fullScreenCover(isPresented: .constant(userSettings.showOnboarding)) {
-            FavoriteTeamSelectionView(isOnboarding: true)
+            OnboardingFlowView()
         }
     }
 }

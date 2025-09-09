@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var showingTestResult = false
     @State private var notificationPermissionStatus: UNAuthorizationStatus = .notDetermined
     @State private var showingPermissionAlert = false
+    @State private var showingOnboarding = false
     
     var body: some View {
         NavigationView {
@@ -19,16 +20,6 @@ struct SettingsView: View {
                 Section("Favorite Team") {
                     if let favoriteTeam = userSettings.favoriteTeam {
                         HStack {
-                            AsyncImage(url: URL(string: teamLogoURL(for: favoriteTeam))) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                            } placeholder: {
-                                Image(systemName: teamIcon(for: favoriteTeam))
-                                    .foregroundColor(teamColorForName(favoriteTeam))
-                            }
-                            .frame(width: 24, height: 24)
-                            
                             Text(favoriteTeam)
                             
                             Spacer()
@@ -55,6 +46,33 @@ struct SettingsView: View {
                     }
                 }
                 
+                Section("App Introduction") {
+                    Button(action: {
+                        showingOnboarding = true
+                    }) {
+                        HStack {
+                            Image(systemName: "questionmark.circle")
+                                .foregroundColor(.blue)
+                                .frame(width: 24)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("View App Introduction")
+                                    .foregroundColor(.primary)
+                                
+                                Text("See how forecasting works and app features")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                
                 Section("Notifications") {
                     // Permission status indicator
                     if notificationPermissionStatus == .denied {
@@ -67,7 +85,7 @@ struct SettingsView: View {
                                 Spacer()
                             }
                             
-                            Text("Go to Settings → Notifications → EPL Forecast to enable push notifications.")
+                            Text("Go to Settings → Notifications → League Forecast to enable push notifications.")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             
@@ -225,6 +243,9 @@ struct SettingsView: View {
         .sheet(isPresented: $showingTeamSelection) {
             FavoriteTeamSelectionView(isOnboarding: false)
         }
+        .fullScreenCover(isPresented: $showingOnboarding) {
+            OnboardingFlowView()
+        }
         .alert("Test Notification", isPresented: $showingTestResult) {
             Button("OK") {
                 testNotificationResult = nil
@@ -243,16 +264,6 @@ struct SettingsView: View {
         }
     }
     
-    private func teamColorForName(_ teamName: String) -> Color {
-        // Create a temporary team object to get color
-        let dummyTeam = Team(
-            name: teamName,
-            played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, against: 0,
-            goalDifference: 0, points: 0, pointsPerGame: 0, forecastedPoints: 0,
-            currentPosition: 0, forecastedPosition: 0
-        )
-        return dummyTeam.primaryColor
-    }
     
     private func checkNotificationPermissions() {
         UNUserNotificationCenter.current().getNotificationSettings { settings in

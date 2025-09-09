@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import WidgetKit
 
 enum NotificationTiming: String, CaseIterable {
     case immediate = "immediate"
@@ -63,6 +64,9 @@ class UserSettings: ObservableObject {
             
             // Also save to shared container for widget
             SharedDataManager.shared.favoriteTeam = favoriteTeam
+            
+            // Force widget refresh when favorite team changes
+            WidgetCenter.shared.reloadAllTimelines()
             
             // Force synchronization
             UserDefaults.standard.synchronize()

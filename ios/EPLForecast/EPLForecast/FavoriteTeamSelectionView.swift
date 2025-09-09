@@ -147,17 +147,6 @@ struct TeamSelectionRow: View {
     var body: some View {
         Button(action: onTap) {
             HStack {
-                // Team logo/icon
-                AsyncImage(url: URL(string: teamLogoURL(for: team.name))) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                } placeholder: {
-                    Image(systemName: teamIcon(for: team.name))
-                        .foregroundColor(team.primaryColor)
-                }
-                .frame(width: 32, height: 32)
-                
                 VStack(alignment: .leading, spacing: 4) {
                     Text(team.name)
                         .font(.body)
