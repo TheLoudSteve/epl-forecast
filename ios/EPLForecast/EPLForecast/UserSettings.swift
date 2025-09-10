@@ -213,7 +213,7 @@ class UserSettings: ObservableObject {
     }
     
     var showOnboarding: Bool {
-        return !hasLaunchedBefore || favoriteTeam == nil
+        return !hasLaunchedBefore
     }
     
     func setFavoriteTeam(_ teamName: String) {

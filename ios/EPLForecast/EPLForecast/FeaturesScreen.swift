@@ -168,7 +168,7 @@ struct NotificationFeatureView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                     
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("English League Forecast")
+                        Text("League Forecast")
                             .font(.caption)
                             .fontWeight(.semibold)
                         

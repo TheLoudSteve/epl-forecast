@@ -8,7 +8,7 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             TableView(shouldResetScroll: $shouldResetScroll)
-                .navigationTitle("English League Forecast")
+                .navigationTitle("League Forecast")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
