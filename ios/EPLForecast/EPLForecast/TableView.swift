@@ -6,6 +6,16 @@ struct TableView: View {
     @ObservedObject private var userSettings = UserSettings.shared
     @State private var scrollPosition: String?
     @Binding var shouldResetScroll: Bool
+    @State private var showForecast = true
+    
+    // Computed property for sorted teams based on current view mode
+    var sortedTeams: [Team] {
+        if showForecast {
+            return eplService.teams.sorted { $0.forecastedPosition < $1.forecastedPosition }
+        } else {
+            return eplService.teams.sorted { $0.currentPosition < $1.currentPosition }
+        }
+    }
     
     var body: some View {
         VStack {
@@ -46,15 +56,60 @@ struct TableView: View {
                 .padding()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollViewReader { proxy in
-                    ScrollView {
+                VStack(spacing: 0) {
+                    // Toggle between Forecast and Live views
+                    HStack {
+                        Spacer()
+                        
+                        HStack(spacing: 0) {
+                            Button("Forecast") {
+                                withAnimation(.easeInOut(duration: 0.5)) {
+                                    showForecast = true
+                                }
+                            }
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(showForecast ? .white : .blue)
+                            .frame(width: 75, height: 32)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(showForecast ? .blue : .clear)
+                            )
+                            
+                            Button("Live") {
+                                withAnimation(.easeInOut(duration: 0.5)) {
+                                    showForecast = false
+                                }
+                            }
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(!showForecast ? .white : .blue)
+                            .frame(width: 75, height: 32)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(!showForecast ? .blue : .clear)
+                            )
+                        }
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(.blue, lineWidth: 1)
+                        )
+                        
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    
+                    ScrollViewReader { proxy in
+                        ScrollView {
                         VStack(spacing: 4) {
-                            ForEach(Array(eplService.teams.enumerated()), id: \.element.id) { index, team in
+                            ForEach(Array(sortedTeams.enumerated()), id: \.element.id) { index, team in
                                 VStack(spacing: 0) {
                                     TeamRowView(
                                         team: team,
                                         isFavorite: team.name == userSettings.favoriteTeam,
-                                        position: index + 1
+                                        position: index + 1,
+                                        showForecast: showForecast
                                     )
                                     .id("team-\(index)")
                                     
@@ -105,7 +160,7 @@ struct TableView: View {
                         
                         // Go back to the EXACT approach that worked, with LazyVStack fix
                         if let favoriteTeam = userSettings.favoriteTeam,
-                           let favoriteIndex = eplService.teams.firstIndex(where: { $0.name == favoriteTeam }) {
+                           let favoriteIndex = sortedTeams.firstIndex(where: { $0.name == favoriteTeam }) {
                             print("🎯 Found favorite team '\(favoriteTeam)' at index \(favoriteIndex)")
                             
                             // With VStack, all teams render immediately
@@ -117,11 +172,11 @@ struct TableView: View {
                             print("❌ No favorite team set or not found")
                         }
                     }
-                    .onChange(of: eplService.teams) {
-                        print("🔄 Teams data changed - count: \(eplService.teams.count)")
-                        if !eplService.teams.isEmpty,
+                    .onChange(of: sortedTeams) {
+                        print("🔄 Teams data changed - count: \(sortedTeams.count)")
+                        if !sortedTeams.isEmpty,
                            let favoriteTeam = userSettings.favoriteTeam,
-                           let favoriteIndex = eplService.teams.firstIndex(where: { $0.name == favoriteTeam }) {
+                           let favoriteIndex = sortedTeams.firstIndex(where: { $0.name == favoriteTeam }) {
                             
                             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                                 proxy.scrollTo("team-\(favoriteIndex)", anchor: .center)
@@ -133,7 +188,7 @@ struct TableView: View {
                             print("🔄 Resetting scroll position after settings")
                             
                             if let favoriteTeam = userSettings.favoriteTeam,
-                               let favoriteIndex = eplService.teams.firstIndex(where: { $0.name == favoriteTeam }) {
+                               let favoriteIndex = sortedTeams.firstIndex(where: { $0.name == favoriteTeam }) {
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                                     proxy.scrollTo("team-\(favoriteIndex)", anchor: .center)
                                 }
@@ -141,6 +196,18 @@ struct TableView: View {
                             shouldResetScroll = false
                         }
                     }
+                    .onChange(of: showForecast) { _, _ in
+                        // Add a slight delay for animation smoothness when switching views
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            if let favoriteTeam = userSettings.favoriteTeam,
+                               let favoriteIndex = sortedTeams.firstIndex(where: { $0.name == favoriteTeam }) {
+                                withAnimation(.easeInOut(duration: 0.5)) {
+                                    proxy.scrollTo("team-\(favoriteIndex)", anchor: .center)
+                                }
+                            }
+                        }
+                    }
+                }
                 }
             }
         }
@@ -154,23 +221,23 @@ struct TableView: View {
     }
     
     private func scrollToFavoriteTeam(proxy: ScrollViewProxy) {
-        print("🔍 DEBUG - Teams count: \(eplService.teams.count), Favorite: '\(userSettings.favoriteTeam ?? "nil")'")
+        print("🔍 DEBUG - Teams count: \(sortedTeams.count), Favorite: '\(userSettings.favoriteTeam ?? "nil")'")
         
-        guard !eplService.teams.isEmpty, let favoriteTeam = userSettings.favoriteTeam else {
-            print("❌ No teams or no favorite team set - Teams: \(eplService.teams.count), Favorite: \(userSettings.favoriteTeam ?? "nil")")
+        guard !sortedTeams.isEmpty, let favoriteTeam = userSettings.favoriteTeam else {
+            print("❌ No teams or no favorite team set - Teams: \(sortedTeams.count), Favorite: \(userSettings.favoriteTeam ?? "nil")")
             return
         }
         
-        print("🔍 Available teams: \(eplService.teams.map { $0.name })")
+        print("🔍 Available teams: \(sortedTeams.map { $0.name })")
         
-        guard let favoriteIndex = eplService.teams.firstIndex(where: { $0.name == favoriteTeam }) else {
+        guard let favoriteIndex = sortedTeams.firstIndex(where: { $0.name == favoriteTeam }) else {
             print("❌ Favorite team '\(favoriteTeam)' not found in teams list")
-            print("🔍 Available teams: \(eplService.teams.map { $0.name })")
+            print("🔍 Available teams: \(sortedTeams.map { $0.name })")
             return
         }
         
         let position = favoriteIndex + 1
-        let totalTeams = eplService.teams.count
+        let totalTeams = sortedTeams.count
         
         print("🎯 FAVORITE TEAM SCROLL - '\(favoriteTeam)' at position \(position) of \(totalTeams)")
         
@@ -207,6 +274,7 @@ struct TeamRowView: View {
     let team: Team
     let isFavorite: Bool
     let position: Int
+    let showForecast: Bool
     
     var body: some View {
         HStack {
@@ -218,12 +286,12 @@ struct TeamRowView: View {
                     .frame(width: 8, height: 8)
             }
             
-            Text("\(team.forecastedPosition)")
+            Text("\(showForecast ? team.forecastedPosition : team.currentPosition)")
                 .font(.title3)
                 .fontWeight(.bold)
                 .foregroundColor(isFavorite ? team.primaryColor : positionTextColor)
                 .frame(width: 30, alignment: .leading)
-                .accessibilityLabel("Position \(team.forecastedPosition)")
+                .accessibilityLabel("Position \(showForecast ? team.forecastedPosition : team.currentPosition)")
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(team.name)
@@ -239,12 +307,12 @@ struct TeamRowView: View {
             Spacer()
             
             VStack(alignment: .trailing, spacing: 2) {
-                Text("\(String(format: "%.0f", team.forecastedPoints))")
+                Text("\(showForecast ? String(format: "%.0f", team.forecastedPoints) : String(team.points))")
                     .font(.title3)
                     .fontWeight(.bold)
                     .foregroundColor(isFavorite ? team.primaryColor : .primary)
                 
-                Text("pts")
+                Text(showForecast ? "proj" : "pts")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
@@ -256,12 +324,16 @@ struct TeamRowView: View {
                 .fill(isFavorite ? team.backgroundColor : Color.clear)
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(team.name)\(isFavorite ? " (your team)" : ""), position \(team.forecastedPosition), forecasted \(String(format: "%.0f", team.forecastedPoints)) points, played \(team.played) games, \(String(format: "%.1f", team.pointsPerGame)) points per game")
+        .accessibilityLabel("\(team.name)\(isFavorite ? " (your team)" : ""), position \(showForecast ? team.forecastedPosition : team.currentPosition), \(showForecast ? "forecasted \(String(format: "%.0f", team.forecastedPoints)) points" : "\(team.points) current points"), played \(team.played) games, \(String(format: "%.1f", team.pointsPerGame)) points per game")
     }
     
     // Computed properties for position-based styling
+    var displayPosition: Int {
+        showForecast ? team.forecastedPosition : team.currentPosition
+    }
+    
     var positionIndicatorColor: Color {
-        switch position {
+        switch displayPosition {
         case 1...4:
             return .blue // Champions League
         case 18...20:
@@ -272,7 +344,7 @@ struct TeamRowView: View {
     }
     
     var positionTextColor: Color {
-        switch position {
+        switch displayPosition {
         case 1...4:
             return .blue // Champions League
         case 18...20:
