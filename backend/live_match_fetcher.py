@@ -163,14 +163,14 @@ def check_if_match_happening(s3_bucket: str) -> Dict[str, Any]:
         ics_content = None
         cache_hit = False
 
-        # Try to get cached ICS from S3 first (cache for 10 minutes)
+        # Try to get cached ICS from S3 first (cache for 29 hours - schedules rarely change)
         try:
             response = s3.get_object(Bucket=s3_bucket, Key='epl_fixtures.ics')
             last_modified = response['LastModified']
             now = datetime.now(timezone.utc)
 
-            # Use cache if less than 10 minutes old
-            if (now - last_modified.replace(tzinfo=timezone.utc)).total_seconds() < 600:
+            # Use cache if less than 29 hours old (schedules rarely change, 29h creates daily rotation)
+            if (now - last_modified.replace(tzinfo=timezone.utc)).total_seconds() < 104400:
                 ics_content = response['Body'].read()
                 cache_hit = True
                 print("Using cached ICS data from S3")
