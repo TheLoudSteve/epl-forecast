@@ -7,8 +7,24 @@ from typing import Dict, List, Any
 from decimal import Decimal
 import icalendar
 from dateutil import tz
-from forecast_history import forecast_history_manager
-from notification_logic import notification_manager
+
+# Lazy import heavy modules only when needed
+forecast_history_manager = None
+notification_manager = None
+
+def _get_forecast_history_manager():
+    """Lazy load forecast history manager only when needed."""
+    global forecast_history_manager
+    if forecast_history_manager is None:
+        from forecast_history import forecast_history_manager
+    return forecast_history_manager
+
+def _get_notification_manager():
+    """Lazy load notification manager only when needed."""
+    global notification_manager
+    if notification_manager is None:
+        from notification_logic import notification_manager
+    return notification_manager
 
 # New Relic monitoring
 try:
@@ -62,7 +78,9 @@ def lambda_handler(event, context):
                 newrelic.agent.record_custom_metric('Custom/RapidAPI/CallSkipped', 1)
                 newrelic.agent.add_custom_attribute('rapidapi.skip_reason', 'no_live_matches')
                 newrelic.agent.add_custom_attribute('rapidapi.environment', os.environ.get('ENVIRONMENT', 'unknown'))
-                
+
+            # CRITICAL: Explicitly exit early to avoid timeout
+            print("Function exiting early - no further processing needed")
             return {
                 'statusCode': 200,
                 'body': json.dumps({
@@ -93,8 +111,8 @@ def lambda_handler(event, context):
         # Save forecast snapshot to history
         try:
             context = f"Live match update - {match_context}"
-            snapshot = forecast_history_manager.save_forecast_snapshot(
-                forecast_data, 
+            snapshot = _get_forecast_history_manager().save_forecast_snapshot(
+                forecast_data,
                 context=context
             )
             print(f"Successfully saved live match forecast snapshot with timestamp {snapshot.timestamp}")
@@ -105,7 +123,7 @@ def lambda_handler(event, context):
         # Process notifications for position changes during live matches
         notification_result = {'notifications_sent': 0}
         try:
-            notification_result = notification_manager.process_forecast_update(
+            notification_result = _get_notification_manager().process_forecast_update(
                 forecast_data,
                 context=f"after {match_context}"
             )
@@ -142,21 +160,43 @@ def check_if_match_happening(s3_bucket: str) -> Dict[str, Any]:
     Returns dict with 'happening' boolean and 'context' string
     """
     try:
-        # Fetch ICS feed
-        ics_url = "https://ics.ecal.com/ecal-sub/68a47e3ff49aba000867f867/English%20Premier%20League.ics"
-        response = requests.get(ics_url, timeout=30)
-        response.raise_for_status()
-        
-        # Cache ICS data in S3
-        s3.put_object(
-            Bucket=s3_bucket,
-            Key='epl_fixtures.ics',
-            Body=response.content,
-            ContentType='text/calendar'
-        )
+        ics_content = None
+        cache_hit = False
+
+        # Try to get cached ICS from S3 first (cache for 10 minutes)
+        try:
+            response = s3.get_object(Bucket=s3_bucket, Key='epl_fixtures.ics')
+            last_modified = response['LastModified']
+            now = datetime.now(timezone.utc)
+
+            # Use cache if less than 10 minutes old
+            if (now - last_modified.replace(tzinfo=timezone.utc)).total_seconds() < 600:
+                ics_content = response['Body'].read()
+                cache_hit = True
+                print("Using cached ICS data from S3")
+            else:
+                print("Cached ICS data is stale, fetching fresh")
+        except Exception as cache_error:
+            print(f"Could not retrieve cached ICS: {cache_error}")
+
+        # Fetch fresh ICS if no valid cache
+        if ics_content is None:
+            print("Fetching fresh ICS data from source")
+            ics_url = "https://ics.ecal.com/ecal-sub/68a47e3ff49aba000867f867/English%20Premier%20League.ics"
+            response = requests.get(ics_url, timeout=30)
+            response.raise_for_status()
+            ics_content = response.content
+
+            # Cache fresh ICS data in S3
+            s3.put_object(
+                Bucket=s3_bucket,
+                Key='epl_fixtures.ics',
+                Body=ics_content,
+                ContentType='text/calendar'
+            )
         
         # Parse calendar
-        cal = icalendar.Calendar.from_ical(response.content)
+        cal = icalendar.Calendar.from_ical(ics_content)
         london_tz = tz.gettz('Europe/London')
         now = datetime.now(london_tz)
         
@@ -193,20 +233,24 @@ def check_if_match_happening(s3_bucket: str) -> Dict[str, Any]:
         
         if active_matches:
             context = f"{len(active_matches)} active match(es): " + ", ".join([m['summary'] for m in active_matches])
+            print(f"ICS processing: cache_hit={cache_hit}, matches_found={matches_found}, active_matches={len(active_matches)}")
             return {
                 'happening': True,
                 'context': context,
                 'matches': active_matches,
-                'total_matches_checked': matches_found
+                'total_matches_checked': matches_found,
+                'cache_hit': cache_hit
             }
         else:
             context = f"No live matches (checked {matches_found} total matches)"
+            print(f"ICS processing: cache_hit={cache_hit}, matches_found={matches_found}, active_matches=0")
             print(context)
             return {
                 'happening': False,
                 'context': context,
                 'matches': [],
-                'total_matches_checked': matches_found
+                'total_matches_checked': matches_found,
+                'cache_hit': cache_hit
             }
         
     except Exception as e:
