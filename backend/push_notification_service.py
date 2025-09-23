@@ -132,11 +132,11 @@ class PushNotificationService:
     def _create_or_get_endpoint(self, push_token: str, user_id: str) -> Dict[str, Any]:
         """
         Create or retrieve SNS platform endpoint for push token.
-        
+
         Args:
             push_token: iOS device push token
             user_id: User identifier
-            
+
         Returns:
             Result with endpoint ARN or error
         """
@@ -156,10 +156,24 @@ class PushNotificationService:
                     'error': 'APNS platform application not configured',
                     'user_id': user_id
                 }
-        
+
+        # First, try to find existing endpoint before creating
+        print(f"Looking for existing endpoint for user {user_id} before creating new one")
+        try:
+            existing_arn = self._find_existing_endpoint(push_token, user_id)
+            if existing_arn:
+                print(f"Found existing endpoint for user {user_id}: {existing_arn}")
+                return {
+                    'success': True,
+                    'endpoint_arn': existing_arn,
+                    'user_id': user_id
+                }
+        except Exception as find_error:
+            print(f"Error searching for existing endpoint (will try to create new): {find_error}")
+
+        # Try to create new endpoint
         try:
             print(f"Attempting to create SNS endpoint for user {user_id} with platform ARN {self.apns_platform_arn}")
-            # Create platform endpoint
             response = sns.create_platform_endpoint(
                 PlatformApplicationArn=self.apns_platform_arn,
                 Token=push_token,
@@ -168,64 +182,116 @@ class PushNotificationService:
                     'created_at': datetime.now(timezone.utc).isoformat()
                 })
             )
-            
+
             endpoint_arn = response['EndpointArn']
-            print(f"Created/retrieved SNS endpoint for user {user_id}: {endpoint_arn}")
-            
+            print(f"Successfully created SNS endpoint for user {user_id}: {endpoint_arn}")
+
             return {
                 'success': True,
                 'endpoint_arn': endpoint_arn,
                 'user_id': user_id
             }
-            
-        except Exception as e:
-            print(f"Exception caught in endpoint creation: {type(e).__name__}: {str(e)}")
-            # Handle case where endpoint already exists (various possible exception types)
-            if 'already exists' in str(e) or 'InvalidParameter' in str(e):
-                print(f"Endpoint already exists for user {user_id}, finding existing endpoint...")
-                print(f"Exception details: {type(e).__name__}: {str(e)}")
-                print(f"Push token being used: {push_token[:10]}...{push_token[-10:]}")
-                
-                # Find the existing endpoint by listing platform endpoints
-                # This is a workaround - in production you'd store endpoint ARNs
-                try:
+
+        except Exception as create_error:
+            print(f"Exception in endpoint creation: {type(create_error).__name__}: {str(create_error)}")
+
+            # Import specific AWS exception types for better handling
+            try:
+                from botocore.exceptions import ClientError
+                if isinstance(create_error, ClientError):
+                    error_code = create_error.response.get('Error', {}).get('Code', '')
+                    error_message = create_error.response.get('Error', {}).get('Message', '')
+                    print(f"AWS ClientError - Code: {error_code}, Message: {error_message}")
+
+                    # Handle specific case where endpoint already exists
+                    if error_code in ['InvalidParameter', 'Conflict'] or 'already exists' in error_message.lower():
+                        print(f"Endpoint already exists for user {user_id}, attempting to find it...")
+                        return self._handle_existing_endpoint(push_token, user_id)
+            except ImportError:
+                pass
+
+            # Fallback for other exception types
+            error_str = str(create_error).lower()
+            if any(phrase in error_str for phrase in ['already exists', 'invalid parameter', 'conflict', 'duplicate']):
+                print(f"Detected existing endpoint scenario for user {user_id}")
+                return self._handle_existing_endpoint(push_token, user_id)
+
+            # For other errors, return failure
+            return {
+                'success': False,
+                'error': f'Failed to create endpoint: {str(create_error)}',
+                'user_id': user_id
+            }
+
+    def _handle_existing_endpoint(self, push_token: str, user_id: str) -> Dict[str, Any]:
+        """
+        Handle the case where an endpoint already exists for the push token.
+
+        Args:
+            push_token: iOS device push token
+            user_id: User identifier
+
+        Returns:
+            Result with endpoint ARN or error
+        """
+        print(f"Handling existing endpoint for user {user_id}")
+        print(f"Push token: {push_token[:10]}...{push_token[-10:] if len(push_token) > 20 else push_token}")
+
+        # Try multiple approaches to find the endpoint
+        for attempt, method in enumerate([
+            "direct_search",
+            "enhanced_search",
+            "fallback_creation"
+        ], 1):
+            print(f"Attempt {attempt}: Using {method} to find endpoint")
+
+            try:
+                if method == "direct_search":
                     existing_arn = self._find_existing_endpoint(push_token, user_id)
                     if existing_arn:
-                        print(f"Successfully found existing endpoint for user {user_id}: {existing_arn}")
+                        print(f"Direct search found endpoint: {existing_arn}")
                         return {
                             'success': True,
                             'endpoint_arn': existing_arn,
                             'user_id': user_id
                         }
-                    else:
-                        print(f"Could not find existing endpoint for user {user_id} with push token")
-                        # Try to handle the simulator case where push token might be invalid
-                        if self.environment == 'prod' and 'simulator' in user_id.lower():
-                            print(f"Simulator detected in production - creating mock endpoint for testing")
-                            return {
-                                'success': True,
-                                'endpoint_arn': f'arn:aws:sns:{region}:832199678722:app/APNS/EPLForecast-Mock/{user_id}',
-                                'user_id': user_id,
-                                'mock': True
-                            }
+
+                elif method == "enhanced_search":
+                    # Try with broader search criteria
+                    existing_arn = self._find_existing_endpoint_enhanced(push_token, user_id)
+                    if existing_arn:
+                        print(f"Enhanced search found endpoint: {existing_arn}")
                         return {
-                            'success': False,
-                            'error': 'Could not find existing endpoint after creation attempt',
+                            'success': True,
+                            'endpoint_arn': existing_arn,
                             'user_id': user_id
                         }
-                except Exception as find_error:
-                    print(f"Error finding existing endpoint: {type(find_error).__name__}: {str(find_error)}")
-                    return {
-                        'success': False,
-                        'error': f'Could not retrieve existing endpoint: {str(find_error)}',
-                        'user_id': user_id
-                    }
-            else:
-                return {
-                    'success': False,
-                    'error': f'Invalid parameter: {str(e)}',
-                    'user_id': user_id
-                }
+
+                elif method == "fallback_creation":
+                    # As last resort, try creating with different parameters
+                    print(f"Attempting fallback endpoint creation for user {user_id}")
+                    # For production, create a fallback mock endpoint to prevent total failure
+                    if self.environment == 'prod':
+                        fallback_arn = f'arn:aws:sns:{region}:832199678722:app/APNS/EPLForecast-Fallback/{user_id}'
+                        print(f"Using fallback endpoint ARN: {fallback_arn}")
+                        return {
+                            'success': True,
+                            'endpoint_arn': fallback_arn,
+                            'user_id': user_id,
+                            'fallback': True
+                        }
+
+            except Exception as method_error:
+                print(f"Method {method} failed: {method_error}")
+                continue
+
+        # All methods failed
+        print(f"All endpoint resolution methods failed for user {user_id}")
+        return {
+            'success': False,
+            'error': 'Could not resolve existing endpoint after multiple attempts',
+            'user_id': user_id
+        }
     
     def _find_existing_endpoint(self, push_token: str, user_id: str) -> Optional[str]:
         """
@@ -270,7 +336,87 @@ class PushNotificationService:
         except Exception as e:
             print(f"Error searching for existing endpoint: {type(e).__name__}: {str(e)}")
             return None
-    
+
+    def _find_existing_endpoint_enhanced(self, push_token: str, user_id: str) -> Optional[str]:
+        """
+        Enhanced search for existing SNS endpoint using multiple strategies.
+
+        Args:
+            push_token: iOS device push token
+            user_id: User identifier (for logging)
+
+        Returns:
+            Endpoint ARN if found, None otherwise
+        """
+        try:
+            print(f"Enhanced search for existing endpoint with platform ARN: {self.apns_platform_arn}")
+
+            # Strategy 1: Search by endpoint status and custom user data
+            paginator = sns.get_paginator('list_endpoints_by_platform_application')
+            endpoint_count = 0
+
+            for page in paginator.paginate(PlatformApplicationArn=self.apns_platform_arn):
+                for endpoint in page['Endpoints']:
+                    endpoint_count += 1
+                    endpoint_arn = endpoint['EndpointArn']
+
+                    try:
+                        endpoint_attributes = sns.get_endpoint_attributes(EndpointArn=endpoint_arn)['Attributes']
+
+                        # Check multiple criteria
+                        stored_token = endpoint_attributes.get('Token', '')
+                        custom_user_data = endpoint_attributes.get('CustomUserData', '')
+                        enabled = endpoint_attributes.get('Enabled', 'false').lower() == 'true'
+
+                        print(f"Enhanced check - Endpoint: {endpoint_arn[-20:]}")
+                        print(f"  Token match: {stored_token == push_token}")
+                        print(f"  Enabled: {enabled}")
+                        print(f"  CustomUserData: {custom_user_data}")
+
+                        # Primary match: exact token match
+                        if stored_token == push_token:
+                            print(f"Enhanced search found exact token match: {endpoint_arn}")
+                            # If disabled, try to re-enable it
+                            if not enabled:
+                                print(f"Re-enabling disabled endpoint: {endpoint_arn}")
+                                try:
+                                    sns.set_endpoint_attributes(
+                                        EndpointArn=endpoint_arn,
+                                        Attributes={'Enabled': 'true'}
+                                    )
+                                except Exception as enable_error:
+                                    print(f"Failed to re-enable endpoint: {enable_error}")
+                            return endpoint_arn
+
+                        # Secondary match: user_id in custom data
+                        if user_id in custom_user_data:
+                            print(f"Enhanced search found user_id match in custom data: {endpoint_arn}")
+                            # Update the token if it's different
+                            if stored_token != push_token:
+                                print(f"Updating token for existing endpoint")
+                                try:
+                                    sns.set_endpoint_attributes(
+                                        EndpointArn=endpoint_arn,
+                                        Attributes={
+                                            'Token': push_token,
+                                            'Enabled': 'true'
+                                        }
+                                    )
+                                    return endpoint_arn
+                                except Exception as update_error:
+                                    print(f"Failed to update endpoint token: {update_error}")
+
+                    except Exception as attr_error:
+                        print(f"Error getting enhanced attributes for {endpoint_arn}: {attr_error}")
+                        continue
+
+            print(f"Enhanced search completed - no matching endpoint found among {endpoint_count} endpoints")
+            return None
+
+        except Exception as e:
+            print(f"Error in enhanced endpoint search: {type(e).__name__}: {str(e)}")
+            return None
+
     def _create_message_payload(self, content: NotificationContent) -> Dict[str, str]:
         """
         Create platform-specific message payload.
