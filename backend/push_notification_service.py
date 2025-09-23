@@ -268,18 +268,9 @@ class PushNotificationService:
                         }
 
                 elif method == "fallback_creation":
-                    # As last resort, try creating with different parameters
-                    print(f"Attempting fallback endpoint creation for user {user_id}")
-                    # For production, create a fallback mock endpoint to prevent total failure
-                    if self.environment == 'prod':
-                        fallback_arn = f'arn:aws:sns:{region}:832199678722:app/APNS/EPLForecast-Fallback/{user_id}'
-                        print(f"Using fallback endpoint ARN: {fallback_arn}")
-                        return {
-                            'success': True,
-                            'endpoint_arn': fallback_arn,
-                            'user_id': user_id,
-                            'fallback': True
-                        }
+                    # Skip fallback for now to debug the real issue
+                    print(f"Skipping fallback creation to debug real endpoint lookup issue")
+                    continue
 
             except Exception as method_error:
                 print(f"Method {method} failed: {method_error}")
