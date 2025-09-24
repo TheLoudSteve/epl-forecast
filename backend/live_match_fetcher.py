@@ -47,22 +47,62 @@ s3 = boto3.client('s3', region_name=region)
 def lambda_handler(event, context):
     """
     Lambda function to check for live matches and update data if needed
-    Runs every 2 minutes but only calls RapidAPI during match windows
+    OPTIMIZATION: Quick pre-check to avoid expensive ICS processing on non-match days
     """
     try:
         print(f"Live match check triggered with event: {event}")
-        
+
         # Add New Relic custom attributes
         if NEW_RELIC_ENABLED:
             newrelic.agent.add_custom_attribute('lambda.event_type', 'live_match_check')
             newrelic.agent.add_custom_attribute('lambda.environment', os.environ.get('ENVIRONMENT', 'unknown'))
-        
+
         table_name = os.environ['DYNAMODB_TABLE']
         s3_bucket = os.environ['S3_BUCKET']
         rapidapi_key = os.environ['RAPIDAPI_KEY']
-        
+
         print(f"Environment variables - Table: {table_name}, Bucket: {s3_bucket}")
-        
+
+        # DYNAMIC SCHEDULING: Detect execution mode (dynamic vs legacy)
+        is_dynamic_mode = detect_dynamic_scheduling_mode(event)
+        execution_mode = 'dynamic' if is_dynamic_mode else 'legacy'
+
+        print(f"Execution mode: {execution_mode}")
+
+        # Add execution mode to New Relic
+        if NEW_RELIC_ENABLED:
+            newrelic.agent.add_custom_attribute('execution_mode', execution_mode)
+            newrelic.agent.record_custom_metric(f'Custom/LiveFetcher/{execution_mode.title()}Execution', 1)
+
+        # DYNAMIC MODE: Skip ICS processing, directly call RapidAPI
+        if is_dynamic_mode:
+            return handle_dynamic_scheduled_match(table_name, rapidapi_key, event)
+
+        # LEGACY MODE: Continue with existing logic (ICS parsing + quick checks)
+        print("Running in LEGACY mode - using existing ICS parsing logic")
+
+        # COST OPTIMIZATION: Quick pre-check before expensive ICS processing
+        quick_check = quick_match_day_check()
+        if not quick_check['likely_match_day']:
+            print(f"Quick check: No matches likely today - {quick_check['reason']}")
+            # Record skipped execution for monitoring
+            if NEW_RELIC_ENABLED:
+                newrelic.agent.record_custom_metric('Custom/LiveFetcher/QuickCheckSkipped', 1)
+                newrelic.agent.add_custom_attribute('skip_reason', quick_check['reason'])
+
+            return {
+                'statusCode': 200,
+                'body': json.dumps({
+                    'message': 'Quick check: No matches likely - skipped expensive processing',
+                    'timestamp': datetime.now(timezone.utc).isoformat(),
+                    'reason': quick_check['reason'],
+                    'optimization': 'quick_check_skip',
+                    'execution_mode': 'legacy'
+                })
+            }
+
+        print(f"Quick check passed: {quick_check['reason']} - proceeding with full match check")
+
         # Check if we should update based on live matches
         match_result = check_if_match_happening(s3_bucket)
         match_happening = match_result.get('happening', False)
@@ -87,7 +127,8 @@ def lambda_handler(event, context):
                     'message': 'No live matches - skipped API call',
                     'timestamp': datetime.now(timezone.utc).isoformat(),
                     'match_happening': False,
-                    'match_context': match_context
+                    'match_context': match_context,
+                    'execution_mode': 'legacy'
                 })
             }
         
@@ -139,6 +180,7 @@ def lambda_handler(event, context):
                 'timestamp': datetime.now(timezone.utc).isoformat(),
                 'teams_processed': len(forecast_data.get('teams', [])),
                 'match_happening': True,
+                'execution_mode': 'legacy',
                 'notifications_sent': notification_result.get('notifications_sent', 0)
             })
         }
@@ -149,9 +191,190 @@ def lambda_handler(event, context):
             'statusCode': 500,
             'body': json.dumps({
                 'error': str(e),
-                'timestamp': datetime.now(timezone.utc).isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'execution_mode': 'legacy'
             })
         }
+
+def detect_dynamic_scheduling_mode(event: Dict[str, Any]) -> bool:
+    """
+    Detect if this execution is from dynamic scheduling (Schedule Manager) or legacy polling.
+
+    Dynamic mode indicators:
+    1. Event source is 'schedule-manager'
+    2. Event contains 'dynamic_scheduling': True
+    3. Event contains match_info from Schedule Manager
+
+    Args:
+        event: Lambda event payload
+
+    Returns:
+        True if dynamic mode, False if legacy mode
+    """
+    try:
+        # Check for Schedule Manager event markers
+        if isinstance(event, dict):
+            # Direct marker from Schedule Manager
+            if event.get('dynamic_scheduling') is True:
+                return True
+
+            # Event source from Schedule Manager
+            if event.get('source') == 'schedule-manager':
+                return True
+
+            # Check for match_info payload (Schedule Manager specific)
+            if 'match_info' in event:
+                return True
+
+        return False
+
+    except Exception as e:
+        print(f"Error detecting dynamic mode, defaulting to legacy: {e}")
+        return False
+
+
+def handle_dynamic_scheduled_match(table_name: str, rapidapi_key: str, event: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Handle dynamically scheduled match execution - optimized path without ICS parsing.
+
+    When Schedule Manager triggers this function, we know a match is happening,
+    so we can skip all the expensive ICS processing and go directly to RapidAPI.
+
+    Args:
+        table_name: DynamoDB table name
+        rapidapi_key: RapidAPI key
+        event: Lambda event with match info
+
+    Returns:
+        Standard Lambda response
+    """
+    try:
+        print("🚀 DYNAMIC MODE: Processing scheduled match without ICS parsing")
+
+        # Extract match info if available
+        match_info = event.get('match_info', {})
+        match_context = match_info.get('summary', 'Scheduled match')
+
+        print(f"Match context from Schedule Manager: {match_context}")
+
+        # Record dynamic execution metrics
+        if NEW_RELIC_ENABLED:
+            newrelic.agent.record_custom_metric('Custom/LiveFetcher/DynamicModeExecution', 1)
+            newrelic.agent.add_custom_attribute('match_context', match_context)
+            newrelic.agent.add_custom_attribute('scheduled_by', 'schedule_manager')
+
+        # Get DynamoDB table
+        table = dynamodb.Table(table_name)
+
+        # Since we're dynamically scheduled, we know matches are happening
+        # Skip ICS processing and go directly to RapidAPI
+        print("Fetching fresh EPL data (dynamic scheduling - no ICS check needed)")
+
+        epl_data = fetch_epl_data(rapidapi_key, f"Dynamic: {match_context}")
+        print(f"Fetched EPL data with {len(epl_data.get('table', []))} teams")
+
+        # Calculate forecasts
+        forecast_data = calculate_forecasts(epl_data)
+        print(f"Calculated forecast data for {len(forecast_data.get('teams', []))} teams")
+
+        # Store in DynamoDB
+        store_data(table, forecast_data)
+        print("Successfully stored dynamic match data in DynamoDB")
+
+        # Save forecast snapshot to history
+        try:
+            context = f"Dynamic match update - {match_context}"
+            snapshot = _get_forecast_history_manager().save_forecast_snapshot(
+                forecast_data,
+                context=context
+            )
+            print(f"Successfully saved dynamic match forecast snapshot with timestamp {snapshot.timestamp}")
+        except Exception as snapshot_error:
+            print(f"Error saving dynamic match forecast snapshot: {snapshot_error}")
+
+        # Process notifications for position changes
+        notification_result = {'notifications_sent': 0}
+        try:
+            notification_result = _get_notification_manager().process_forecast_update(
+                forecast_data,
+                context=f"Dynamic: {match_context}"
+            )
+            print(f"Dynamic match notification processing result: {notification_result}")
+        except Exception as notification_error:
+            print(f"Error processing dynamic match notifications: {notification_error}")
+
+        return {
+            'statusCode': 200,
+            'body': json.dumps({
+                'message': 'Dynamic scheduled match processed successfully',
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'teams_processed': len(forecast_data.get('teams', [])),
+                'match_context': match_context,
+                'execution_mode': 'dynamic',
+                'notifications_sent': notification_result.get('notifications_sent', 0)
+            })
+        }
+
+    except Exception as e:
+        print(f"Error in dynamic mode: {str(e)}")
+        if NEW_RELIC_ENABLED:
+            newrelic.agent.record_exception()
+        return {
+            'statusCode': 500,
+            'body': json.dumps({
+                'error': str(e),
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'execution_mode': 'dynamic'
+            })
+        }
+
+
+def quick_match_day_check() -> Dict[str, Any]:
+    """
+    COST OPTIMIZATION: Quick check to avoid expensive ICS processing on obvious non-match days.
+
+    Uses simple heuristics to determine if it's worth doing full ICS processing:
+    1. Premier League typically plays Saturday/Sunday/Wednesday/Monday
+    2. Season runs roughly August-May
+    3. No matches during certain international breaks
+
+    Returns:
+        dict: {'likely_match_day': bool, 'reason': str}
+    """
+    now = datetime.now(tz.gettz('Europe/London'))
+    current_day = now.weekday()  # 0=Monday, 6=Sunday
+    current_month = now.month
+    current_hour = now.hour
+
+    # Quick seasonal check: Premier League season typically August (8) to May (5)
+    if current_month in [6, 7]:  # June-July: Summer break
+        return {
+            'likely_match_day': False,
+            'reason': f'Summer break (month {current_month})'
+        }
+
+    # Quick day-of-week check: Most EPL matches on Sat(5), Sun(6), Mon(0), Wed(2), Thu(3)
+    # Tue(1), Fri(4) are very rare for EPL matches
+    if current_day in [1, 4]:  # Tuesday, Friday
+        return {
+            'likely_match_day': False,
+            'reason': f'Rare match day: {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][current_day]}'
+        }
+
+    # Quick time-of-day check: EPL matches typically 12:30-21:00 London time
+    # Outside these hours + 3-hour buffer, very unlikely to have live matches
+    if current_hour < 9 or current_hour > 24:  # Before 9am or after midnight
+        return {
+            'likely_match_day': False,
+            'reason': f'Outside typical match hours ({current_hour:02d}:xx London time)'
+        }
+
+    # If we pass all quick checks, it's worth doing full ICS processing
+    return {
+        'likely_match_day': True,
+        'reason': f'{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][current_day]} {current_hour:02d}:xx in season'
+    }
+
 
 def check_if_match_happening(s3_bucket: str) -> Dict[str, Any]:
     """
