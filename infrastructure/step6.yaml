@@ -640,15 +640,37 @@ Resources:
       Principal: events.amazonaws.com
       SourceArn: !GetAtt ScheduledDataFetcherRule.Arn
 
-  # EventBridge rule for live match fetcher (every 2 minutes, production only)
+  # EventBridge rule for Schedule Manager (daily at 06:00 UTC)
+  ScheduleManagerRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub 'epl-schedule-manager-${Environment}'
+      Description: 'Trigger Schedule Manager daily to create dynamic match rules'
+      ScheduleExpression: 'cron(0 6 * * ? *)'
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt ScheduleManagerFunction.Arn
+          Id: 'ScheduleManagerTarget'
+
+  # Permission for EventBridge to invoke the Schedule Manager function
+  ScheduleManagerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ScheduleManagerFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt ScheduleManagerRule.Arn
+
+  # EventBridge rule for live match fetcher - DISABLED for cost optimization
+  # Schedule Manager creates dynamic rules only when matches are detected
   LiveMatchFetcherRule:
     Type: AWS::Events::Rule
     Condition: IsProduction
     Properties:
       Name: !Sub 'epl-live-fetcher-${Environment}'
-      Description: 'Trigger EPL live match fetcher every 2 minutes in production'
+      Description: 'Legacy live match fetcher rule - DISABLED for cost optimization. Schedule Manager creates dynamic rules instead.'
       ScheduleExpression: 'rate(2 minutes)'
-      State: ENABLED
+      State: DISABLED
       Targets:
         - Arn: !GetAtt LiveMatchFetcherFunction.Arn
           Id: 'LiveMatchFetcherTarget'
