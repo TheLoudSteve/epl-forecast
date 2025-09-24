@@ -86,6 +86,31 @@ Resources:
         AttributeName: ttl
         Enabled: true
 
+  # DynamoDB table for schedule manager (match schedule cache)
+  ScheduleManagerTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'epl-match-schedule-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: schedule_id
+          AttributeType: S
+        - AttributeName: match_date
+          AttributeType: S
+      KeySchema:
+        - AttributeName: schedule_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: MatchDateIndex
+          KeySchema:
+            - AttributeName: match_date
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
   # S3 bucket for ICS feed cache
   ICSCacheBucket:
     Type: AWS::S3::Bucket
@@ -140,6 +165,22 @@ Resources:
                     - !Ref APNSPlatformApplicationArn
                     - !Ref 'AWS::NoValue'
                   - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:endpoint/APNS*/*'
+        - PolicyName: EventBridgeManagementPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - events:PutRule
+                  - events:DeleteRule
+                  - events:PutTargets
+                  - events:RemoveTargets
+                  - events:ListRules
+                  - events:DescribeRule
+                  - events:ListTargetsByRule
+                Resource:
+                  - !Sub 'arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/epl-match-*'
+                  - !Sub 'arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/epl-dynamic-match-*'
 
   # IAM role for New Relic AWS integration (API polling)
   NewRelicInfrastructureRole:
@@ -262,6 +303,34 @@ Resources:
           NEW_RELIC_ACCOUNT_ID: !If [EnableNewRelic, !Ref NewRelicAccountId, !Ref 'AWS::NoValue']
           NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
           NEW_RELIC_APP_NAME: !If [EnableNewRelic, !Sub 'EPL-Forecast-LiveFetcher-${Environment}', !Ref 'AWS::NoValue']
+
+  # Schedule Manager Lambda function (daily ICS parsing and EventBridge rule management)
+  ScheduleManagerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'epl-schedule-manager-${Environment}'
+      Runtime: python3.11
+      Handler: schedule_manager.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 300
+      MemorySize: 512
+      Layers: !If
+        - EnableNewRelic
+        - - !Sub 'arn:aws:lambda:${AWS::Region}:451483290750:layer:NewRelicPython311:2'
+        - !Ref 'AWS::NoValue'
+      Code:
+        ZipFile: |
+          import json
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': json.dumps('Schedule manager placeholder')}
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          SCHEDULE_TABLE: !Ref ScheduleManagerTable
+          S3_BUCKET: !Ref ICSCacheBucket
+          NEW_RELIC_ACCOUNT_ID: !If [EnableNewRelic, !Ref NewRelicAccountId, !Ref 'AWS::NoValue']
+          NEW_RELIC_LICENSE_KEY: !If [EnableNewRelic, !Ref NewRelicLicenseKey, !Ref 'AWS::NoValue']
+          NEW_RELIC_APP_NAME: !If [EnableNewRelic, !Sub 'EPL-Forecast-ScheduleManager-${Environment}', !Ref 'AWS::NoValue']
 
   # API handler Lambda function
   APIHandlerFunction:
@@ -613,6 +682,12 @@ Outputs:
     Export:
       Name: !Sub '${AWS::StackName}-ForecastHistoryTable'
 
+  ScheduleManagerTable:
+    Description: Schedule manager DynamoDB table name
+    Value: !Ref ScheduleManagerTable
+    Export:
+      Name: !Sub '${AWS::StackName}-ScheduleManagerTable'
+
   PushNotificationTopic:
     Description: SNS topic for push notifications
     Value: !Ref PushNotificationTopic
@@ -643,6 +718,12 @@ Outputs:
     Value: !Ref ScheduledDataFetcherFunction
     Export:
       Name: !Sub '${AWS::StackName}-ScheduledDataFetcherFunction'
+
+  ScheduleManagerFunction:
+    Description: Schedule manager Lambda function name
+    Value: !Ref ScheduleManagerFunction
+    Export:
+      Name: !Sub '${AWS::StackName}-ScheduleManagerFunction'
 
   LiveMatchFetcherFunction:
     Condition: IsProduction
