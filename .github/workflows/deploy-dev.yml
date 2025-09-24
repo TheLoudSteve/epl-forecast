@@ -185,31 +185,39 @@ jobs:
       run: |
         CHANGESET_NAME="${{ steps.changeset.outputs.changeset-id }}"
         echo "Checking changeset status..."
-        
-        # Wait a moment for changeset to be processed
-        sleep 5
-        
-        # Check changeset status - handle both success and no-changes failure
-        CHANGESET_STATUS=$(aws cloudformation describe-change-set --stack-name ${{ env.STACK_NAME }} --change-set-name $CHANGESET_NAME --query 'Status' --output text 2>/dev/null || echo "NOT_FOUND")
-        echo "Changeset status: $CHANGESET_STATUS"
-        
+
+        # Wait for changeset to be processed with proper polling
+        MAX_ATTEMPTS=30
+        ATTEMPT=0
+        CHANGESET_STATUS="CREATE_IN_PROGRESS"
+
+        while [ "$CHANGESET_STATUS" = "CREATE_IN_PROGRESS" ] && [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+          ATTEMPT=$((ATTEMPT + 1))
+          echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Waiting for changeset to be ready..."
+          sleep 10
+
+          CHANGESET_STATUS=$(aws cloudformation describe-change-set --stack-name ${{ env.STACK_NAME }} --change-set-name $CHANGESET_NAME --query 'Status' --output text 2>/dev/null || echo "NOT_FOUND")
+          echo "Changeset status: $CHANGESET_STATUS"
+        done
+
+        # Check final changeset status - handle both success and no-changes failure
         if [ "$CHANGESET_STATUS" = "CREATE_COMPLETE" ]; then
           echo "Changeset created successfully"
-          
+
           echo "Changeset contents:"
           aws cloudformation describe-change-set \
             --stack-name ${{ env.STACK_NAME }} \
             --change-set-name $CHANGESET_NAME \
             --query 'Changes[*].[Action,ResourceChange.LogicalResourceId,ResourceChange.ResourceType,ResourceChange.Replacement]' \
             --output table
-          
+
           # Count changes
           CHANGE_COUNT=$(aws cloudformation describe-change-set --stack-name ${{ env.STACK_NAME }} --change-set-name $CHANGESET_NAME --query 'length(Changes)' --output text)
         elif [ "$CHANGESET_STATUS" = "FAILED" ]; then
           # Check if failure is due to no changes
           STATUS_REASON=$(aws cloudformation describe-change-set --stack-name ${{ env.STACK_NAME }} --change-set-name $CHANGESET_NAME --query 'StatusReason' --output text 2>/dev/null || echo "")
           echo "Changeset failure reason: $STATUS_REASON"
-          
+
           if [[ "$STATUS_REASON" == *"didn't contain changes"* ]] || [[ "$STATUS_REASON" == *"no changes"* ]]; then
             echo "✅ No changes needed - stack is already up-to-date"
             CHANGE_COUNT="0"
@@ -217,6 +225,9 @@ jobs:
             echo "❌ Changeset failed for other reason: $STATUS_REASON"
             exit 1
           fi
+        elif [ "$CHANGESET_STATUS" = "CREATE_IN_PROGRESS" ]; then
+          echo "❌ Changeset timed out after 5 minutes"
+          exit 1
         else
           echo "❌ Unexpected changeset status: $CHANGESET_STATUS"
           exit 1
@@ -319,8 +330,8 @@ jobs:
         
         # Check Lambda functions
         echo "Checking Lambda functions..."
-        FUNCTIONS_EXPECTED=("epl-api-handler-dev" "epl-scheduled-fetcher-dev")
-        
+        FUNCTIONS_EXPECTED=("epl-api-handler-dev" "epl-scheduled-fetcher-dev" "epl-schedule-manager-dev")
+
         for func in "${FUNCTIONS_EXPECTED[@]}"; do
           if aws lambda get-function --function-name "$func" >/dev/null 2>&1; then
             echo "✅ Function $func exists"
@@ -440,6 +451,12 @@ jobs:
           push_notification_service.py \
           forecast_history.py \
           boto3* botocore* jmespath* s3transfer* urllib3* certifi* dateutil* six*
+
+        # Package Schedule Manager
+        zip -r schedule_manager.zip \
+          schedule_manager.py \
+          boto3* requests* dateutil* six* urllib3* botocore* jmespath* s3transfer* \
+          certifi* charset_normalizer* idna* newrelic* icalendar*
     
     - name: Update Lambda functions
       run: |
@@ -454,7 +471,12 @@ jobs:
         aws lambda update-function-code \
           --function-name epl-api-handler-${{ env.ENVIRONMENT }} \
           --zip-file fileb://api_handler.zip
-        
+
+        echo "Updating Schedule Manager..."
+        aws lambda update-function-code \
+          --function-name epl-schedule-manager-${{ env.ENVIRONMENT }} \
+          --zip-file fileb://schedule_manager.zip
+
         echo "✅ Lambda functions updated"
 
     - name: Verify Lambda deployment

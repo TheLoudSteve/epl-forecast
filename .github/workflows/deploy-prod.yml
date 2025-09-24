@@ -76,6 +76,15 @@ jobs:
         pip install requests icalendar -t .
         zip -r ../../lambda-packages/live_match_fetcher.zip .
         cd ../..
+
+        # Package schedule_manager with clean build directory
+        mkdir -p build/schedule_manager
+        cp backend/schedule_manager.py build/schedule_manager/
+        cd build/schedule_manager
+        pip install -r ../../backend/requirements.txt -t .
+        pip install requests icalendar -t .
+        zip -r ../../lambda-packages/schedule_manager.zip .
+        cd ../..
     
     - name: Upload Lambda packages to S3
       run: |
@@ -87,6 +96,7 @@ jobs:
         aws s3 cp lambda-packages/api_handler.zip s3://$BUCKET_NAME/
         aws s3 cp lambda-packages/scheduled_data_fetcher.zip s3://$BUCKET_NAME/
         aws s3 cp lambda-packages/live_match_fetcher.zip s3://$BUCKET_NAME/
+        aws s3 cp lambda-packages/schedule_manager.zip s3://$BUCKET_NAME/
     
     - name: Check if stack exists and cleanup if needed
       run: |
@@ -159,6 +169,13 @@ jobs:
           --function-name epl-live-fetcher-${{ env.ENVIRONMENT }} \
           --s3-bucket $BUCKET_NAME \
           --s3-key live_match_fetcher.zip \
+          --region ${{ env.AWS_REGION }}
+
+        # Update schedule manager function
+        aws lambda update-function-code \
+          --function-name epl-schedule-manager-${{ env.ENVIRONMENT }} \
+          --s3-bucket $BUCKET_NAME \
+          --s3-key schedule_manager.zip \
           --region ${{ env.AWS_REGION }}
     
     - name: Get API endpoint and run integration tests
