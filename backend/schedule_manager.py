@@ -20,7 +20,7 @@ import requests
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Any, Optional
 import icalendar
-from dateutil import tz
+import zoneinfo
 
 # New Relic monitoring
 try:
@@ -151,7 +151,7 @@ def parse_ics_schedule(s3_bucket: str) -> List[Dict[str, Any]]:
 
         # Parse calendar
         cal = icalendar.Calendar.from_ical(ics_content)
-        london_tz = tz.gettz('Europe/London')
+        london_tz = zoneinfo.ZoneInfo('Europe/London')
         now = datetime.now(london_tz)
 
         # Look ahead 48 hours for upcoming matches
