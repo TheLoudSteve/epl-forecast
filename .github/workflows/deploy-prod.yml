@@ -82,7 +82,7 @@ jobs:
         cp backend/schedule_manager.py build/schedule_manager/
         cd build/schedule_manager
         pip install -r ../../backend/requirements.txt -t .
-        pip install requests icalendar -t .
+        pip install requests icalendar pytz -t .
         zip -r ../../lambda-packages/schedule_manager.zip .
         cd ../..
     
