@@ -34,7 +34,7 @@ except Exception as e:
 region = os.environ.get('AWS_REGION', 'us-east-1')
 dynamodb = boto3.resource('dynamodb', region_name=region)
 
-@newrelic.agent.lambda_handler() if NEW_RELIC_ENABLED else lambda x: x
+@newrelic.agent.lambda_handler if NEW_RELIC_ENABLED else lambda x: x
 def lambda_handler(event, context):
     """
     Lambda function to fetch EPL data on schedule (2x daily at 00:00 and 12:00 UTC)

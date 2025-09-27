@@ -25,7 +25,7 @@ region = os.environ.get('AWS_REGION', 'us-east-1')
 dynamodb = boto3.resource('dynamodb', region_name=region)
 s3 = boto3.client('s3', region_name=region)
 
-@newrelic.agent.lambda_handler() if NEW_RELIC_ENABLED else lambda x: x
+@newrelic.agent.lambda_handler if NEW_RELIC_ENABLED else lambda x: x
 def lambda_handler(event, context):
     """
     Lambda function to fetch EPL data and calculate forecasts
