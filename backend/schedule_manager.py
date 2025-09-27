@@ -40,7 +40,7 @@ dynamodb = boto3.resource('dynamodb', region_name=region)
 s3 = boto3.client('s3', region_name=region)
 events = boto3.client('events', region_name=region)
 
-@newrelic.agent.lambda_handler if NEW_RELIC_ENABLED else lambda x: x
+# @newrelic.agent.lambda_handler if NEW_RELIC_ENABLED else lambda x: x
 def lambda_handler(event, context):
     """
     Schedule Manager Lambda function - Daily ICS parsing and EventBridge rule management
