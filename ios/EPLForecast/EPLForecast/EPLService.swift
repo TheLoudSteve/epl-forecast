@@ -208,39 +208,70 @@ class EPLService: ObservableObject {
     // MARK: - App Lifecycle and Periodic Refresh
     
     private func setupNotificationObservers() {
+        // Legacy app lifecycle observers (iOS 12 and earlier)
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(appDidBecomeActive),
             name: UIApplication.didBecomeActiveNotification,
             object: nil
         )
-        
+
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(appWillResignActive),
             name: UIApplication.willResignActiveNotification,
             object: nil
         )
+
+        // Scene-based lifecycle observers (iOS 13+)
+        if #available(iOS 13.0, *) {
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(sceneDidBecomeActive),
+                name: UIScene.didActivateNotification,
+                object: nil
+            )
+
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(sceneWillResignActive),
+                name: UIScene.willDeactivateNotification,
+                object: nil
+            )
+        }
     }
     
     @objc private func appDidBecomeActive() {
         isAppActive = true
-        
-        // Only fetch fresh data if our cache is older than 5 minutes
-        if let cacheTimestamp = UserDefaults(suiteName: "group.com.LoudSteve.EplForecast.EPLForecast")?.object(forKey: "cacheTimestamp") as? Date {
-            if Date().timeIntervalSince(cacheTimestamp) > 5 * 60 {
-                fetchTeams()
-            }
-        } else {
-            fetchTeams() // No cache timestamp, fetch fresh data
-        }
-        
+
+        // EPLF-51: Always refresh data when app becomes active to ensure current information
+        // This is especially important during live match periods when data changes frequently
+        fetchTeams()
+
+        // Track app activation refresh for analytics
+        NewRelic.recordCustomEvent("AppActivationRefresh", attributes: [
+            "timestamp": Date().timeIntervalSince1970,
+            "hasExistingData": !teams.isEmpty
+        ])
+
         startPeriodicRefresh() // Resume 60-second timer
     }
     
     @objc private func appWillResignActive() {
         isAppActive = false
         stopPeriodicRefresh() // Pause timer when app goes to background
+    }
+
+    @available(iOS 13.0, *)
+    @objc private func sceneDidBecomeActive() {
+        // Delegate to app lifecycle handler for consistent behavior
+        appDidBecomeActive()
+    }
+
+    @available(iOS 13.0, *)
+    @objc private func sceneWillResignActive() {
+        // Delegate to app lifecycle handler for consistent behavior
+        appWillResignActive()
     }
     
     private func startPeriodicRefresh() {
