@@ -158,6 +158,7 @@ Resources:
                   - sns:DeleteEndpoint
                   - sns:GetEndpointAttributes
                   - sns:SetEndpointAttributes
+                  - sns:ListEndpointsByPlatformApplication
                 Resource: 
                   - !Ref PushNotificationTopic
                   - !If 
