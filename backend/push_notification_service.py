@@ -316,6 +316,19 @@ class PushNotificationService:
                         
                         if endpoint_attributes.get('Token') == push_token:
                             print(f"Found matching endpoint for push token (user {user_id}): {endpoint['EndpointArn']}")
+
+                            # Check if endpoint is disabled and re-enable it
+                            enabled = endpoint_attributes.get('Enabled', 'false').lower() == 'true'
+                            if not enabled:
+                                print(f"Re-enabling disabled endpoint: {endpoint['EndpointArn']}")
+                                try:
+                                    sns.set_endpoint_attributes(
+                                        EndpointArn=endpoint['EndpointArn'],
+                                        Attributes={'Enabled': 'true'}
+                                    )
+                                except Exception as enable_error:
+                                    print(f"Failed to re-enable endpoint: {enable_error}")
+
                             return endpoint['EndpointArn']
                     except Exception as attr_error:
                         print(f"Error getting attributes for endpoint {endpoint.get('EndpointArn', 'unknown')}: {attr_error}")
