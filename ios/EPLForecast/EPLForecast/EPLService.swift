@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import NewRelic
 import WidgetKit
+import UserNotifications
 
 class EPLService: ObservableObject {
     @Published var teams: [Team] = []
@@ -311,7 +312,29 @@ class EPLService: ObservableObject {
     }
     
     // MARK: - Notification Methods
-    
+
+    func checkNotificationSetup(completion: @escaping (Bool, String) -> Void) {
+        // Check if notification permissions are granted
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                switch settings.authorizationStatus {
+                case .authorized:
+                    completion(true, "Notifications enabled")
+                case .denied:
+                    completion(false, "Notifications are disabled. Please enable them in Settings.")
+                case .notDetermined:
+                    completion(false, "Notification permissions not requested yet")
+                case .provisional:
+                    completion(true, "Provisional notifications enabled")
+                case .ephemeral:
+                    completion(true, "Ephemeral notifications enabled")
+                @unknown default:
+                    completion(false, "Unknown notification status")
+                }
+            }
+        }
+    }
+
     func sendTestNotification(completion: @escaping (Result<String, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/preferences/test") else {
             completion(.failure(APIError.invalidURL))
@@ -353,7 +376,21 @@ class EPLService: ObservableObject {
                     ])
                     completion(.success("Test notification sent successfully!"))
                 } else {
-                    let errorMessage = "Failed to send test notification (Status: \(httpResponse.statusCode))"
+                    // Try to parse the error message from the response
+                    var errorMessage = "Failed to send test notification (Status: \(httpResponse.statusCode))"
+
+                    if let data = data {
+                        do {
+                            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                               let backendError = json["error"] as? String {
+                                // Use the descriptive error message from the backend
+                                errorMessage = backendError
+                            }
+                        } catch {
+                            // If parsing fails, use the status code error message
+                        }
+                    }
+
                     NewRelic.recordCustomEvent("TestNotificationFailed", attributes: [
                         "statusCode": httpResponse.statusCode,
                         "error": errorMessage
