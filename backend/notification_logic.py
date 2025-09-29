@@ -285,28 +285,32 @@ class NotificationManager:
     def send_test_notification(self, user_id: str) -> Dict[str, Any]:
         """
         Send a test notification for a specific user.
-        
+
         Args:
             user_id: User ID to send test notification to
-            
+
         Returns:
             Result of test notification
         """
         try:
-            # Get user preferences, or create default ones for testing
+            # Get user preferences - test notifications require existing preferences with push token
             response = self.preferences_table.get_item(Key={'user_id': user_id})
             if 'Item' not in response:
-                # For test notifications, create default preferences
-                print(f"Creating default test preferences for user: {user_id}")
-                preferences = UserNotificationPreferences(
-                    user_id=user_id,
-                    team_name="Liverpool",  # Default team for test
-                    enabled=True,
-                    notification_timing=NotificationTiming.IMMEDIATE,
-                    notification_sensitivity=NotificationSensitivity.ANY_CHANGE
-                )
-            else:
-                preferences = UserNotificationPreferences.from_dynamodb_item(response['Item'])
+                return {
+                    'success': False,
+                    'error': 'No user preferences found. Please register your push token first.',
+                    'user_id': user_id
+                }
+
+            preferences = UserNotificationPreferences.from_dynamodb_item(response['Item'])
+
+            # Validate that user has a push token
+            if not preferences.push_token:
+                return {
+                    'success': False,
+                    'error': 'No push token registered. Please register your push token first.',
+                    'user_id': user_id
+                }
             
             # Create test notification content using the enhanced generator
             test_content = notification_content_generator.generate_test_notification(preferences)
