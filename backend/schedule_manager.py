@@ -43,10 +43,15 @@ events = boto3.client('events', region_name=region)
 # @newrelic.agent.lambda_handler if NEW_RELIC_ENABLED else lambda x: x
 def lambda_handler(event, context):
     """
-    Schedule Manager Lambda function - Daily ICS parsing and EventBridge rule management
+    Schedule Manager Lambda function - Runs every 15 minutes for precise match window control
 
-    This function is the core of the intelligent scheduling system that replaces
-    constant polling (720 executions/day) with precise match-window scheduling.
+    Enables 2-minute polling rule when:
+    - Any match starts in next 15 minutes, OR
+    - Any match is currently active (started but not yet ended)
+
+    Disables 2-minute polling rule when:
+    - No matches starting in next 15 minutes AND
+    - No matches ending in last 30 minutes
     """
     try:
         print(f"Schedule Manager triggered with event: {event}")
@@ -66,54 +71,51 @@ def lambda_handler(event, context):
 
         schedule_table = dynamodb.Table(schedule_table_name)
 
-        # Step 1: Parse ICS feed to extract upcoming matches
-        print("🔍 Step 1: Parsing ICS feed for upcoming matches...")
+        # Step 1: Parse ICS feed to find matches in active/upcoming window
+        print("🔍 Step 1: Checking for active or upcoming matches...")
         matches = parse_ics_schedule(s3_bucket)
-        print(f"Found {len(matches)} upcoming matches in next 48 hours")
+        print(f"Found {len(matches)} matches in ICS feed")
 
-        # Step 2: Clean up old/expired EventBridge rules
-        print("🧹 Step 2: Cleaning up expired EventBridge rules...")
-        cleanup_result = cleanup_old_rules(environment)
-        print(f"Cleanup result: {cleanup_result}")
+        # Step 2: Determine if we're in a match window
+        print("⏰ Step 2: Evaluating match window status...")
+        window_status = evaluate_match_window(matches)
+        print(f"Match window active: {window_status['is_active']}")
+        print(f"Reason: {window_status['reason']}")
 
-        # Step 3: Create EventBridge rules for upcoming matches
-        print("📅 Step 3: Creating EventBridge rules for match windows...")
-        rules_created = create_match_rules(matches, environment)
-        print(f"Created {len(rules_created)} EventBridge rules")
+        # Step 3: Enable/disable the 2-minute polling rule based on match window
+        print("🎛️ Step 3: Managing 2-minute polling rule...")
+        rule_result = manage_polling_rule(window_status, matches, environment)
+        print(f"Rule state: {rule_result['state']}")
 
         # Step 4: Store schedule state in DynamoDB
         print("💾 Step 4: Storing schedule state...")
         schedule_state = {
-            'matches_found': len(matches),
-            'rules_created': len(rules_created),
-            'rules_cleaned': cleanup_result.get('rules_deleted', 0),
-            'matches': matches,
-            'created_rules': rules_created
+            'matches_in_feed': len(matches),
+            'window_active': window_status['is_active'],
+            'window_reason': window_status['reason'],
+            'active_matches': window_status.get('active_matches', []),
+            'upcoming_matches': window_status.get('upcoming_matches', []),
+            'rule_state': rule_result['state'],
+            'matches': matches
         }
         store_schedule_state(schedule_table, schedule_state)
 
         # Record metrics
         if NEW_RELIC_ENABLED:
-            newrelic.agent.record_custom_metric('Custom/ScheduleManager/MatchesFound', len(matches))
-            newrelic.agent.record_custom_metric('Custom/ScheduleManager/RulesCreated', len(rules_created))
-            newrelic.agent.record_custom_metric('Custom/ScheduleManager/RulesDeleted', cleanup_result.get('rules_deleted', 0))
+            newrelic.agent.record_custom_metric('Custom/ScheduleManager/MatchesInFeed', len(matches))
+            newrelic.agent.record_custom_metric('Custom/ScheduleManager/WindowActive', 1 if window_status['is_active'] else 0)
+            newrelic.agent.record_custom_metric('Custom/ScheduleManager/RuleEnabled', 1 if rule_result['state'] == 'ENABLED' else 0)
 
         return {
             'statusCode': 200,
             'body': json.dumps({
                 'message': 'Schedule Manager completed successfully',
                 'timestamp': datetime.now(timezone.utc).isoformat(),
-                'matches_found': len(matches),
-                'rules_created': len(rules_created),
-                'rules_cleaned': cleanup_result.get('rules_deleted', 0),
-                'next_matches': [
-                    {
-                        'summary': match['summary'],
-                        'start_time': match['start_time'],
-                        'rule_name': match['rule_name']
-                    }
-                    for match in matches[:3]  # Show next 3 matches
-                ]
+                'window_active': window_status['is_active'],
+                'window_reason': window_status['reason'],
+                'rule_state': rule_result['state'],
+                'active_matches': window_status.get('active_matches', []),
+                'upcoming_matches': window_status.get('upcoming_matches', [])
             })
         }
 
@@ -132,10 +134,7 @@ def lambda_handler(event, context):
 
 def parse_ics_schedule(s3_bucket: str) -> List[Dict[str, Any]]:
     """
-    Parse ICS feed to extract upcoming EPL matches for next 48 hours.
-
-    This replaces the constant ICS parsing that was happening every 2 minutes
-    in live_match_fetcher with a single daily parse.
+    Parse ICS feed to extract all EPL matches (for window evaluation).
 
     Args:
         s3_bucket: S3 bucket for ICS caching
@@ -146,7 +145,7 @@ def parse_ics_schedule(s3_bucket: str) -> List[Dict[str, Any]]:
     matches = []
 
     try:
-        # Get ICS content (similar to live_match_fetcher logic but simplified)
+        # Get ICS content
         ics_content = get_ics_content(s3_bucket)
 
         # Parse calendar
@@ -154,10 +153,12 @@ def parse_ics_schedule(s3_bucket: str) -> List[Dict[str, Any]]:
         london_tz = zoneinfo.ZoneInfo('Europe/London')
         now = datetime.now(london_tz)
 
-        # Look ahead 48 hours for upcoming matches
-        window_end = now + timedelta(hours=48)
+        # Look ahead 24 hours (enough to check for upcoming matches)
+        # Look back 3 hours (enough to check for recently ended matches)
+        window_start = now - timedelta(hours=3)
+        window_end = now + timedelta(hours=24)
 
-        print(f"Searching for matches between {now.strftime('%Y-%m-%d %H:%M %Z')} and {window_end.strftime('%Y-%m-%d %H:%M %Z')}")
+        print(f"Searching for matches between {window_start.strftime('%Y-%m-%d %H:%M %Z')} and {window_end.strftime('%Y-%m-%d %H:%M %Z')}")
 
         for component in cal.walk():
             if component.name == "VEVENT":
@@ -165,19 +166,19 @@ def parse_ics_schedule(s3_bucket: str) -> List[Dict[str, Any]]:
                 if isinstance(start_time, datetime):
                     start_time = start_time.astimezone(london_tz)
 
-                    # Only include matches in our 48-hour window
-                    if now <= start_time <= window_end:
+                    # Only include matches in our search window
+                    if window_start <= start_time <= window_end:
                         match_summary = component.get('summary', 'Unknown Match')
 
-                        # Calculate match window: 15min before to 2.5 hours after
-                        window_start = start_time - timedelta(minutes=15)
-                        window_end_match = start_time + timedelta(hours=2, minutes=30)
+                        # Calculate match window: 15min before to 2.5 hours after kickoff
+                        match_window_start = start_time - timedelta(minutes=15)
+                        match_window_end = start_time + timedelta(hours=2, minutes=30)
 
                         match_info = {
                             'summary': str(match_summary),
                             'start_time': start_time.isoformat(),
-                            'window_start': window_start.isoformat(),
-                            'window_end': window_end_match.isoformat(),
+                            'window_start': match_window_start.isoformat(),
+                            'window_end': match_window_end.isoformat(),
                             'rule_name': create_rule_name(match_summary, start_time),
                             'match_date': start_time.strftime('%Y-%m-%d')
                         }
@@ -188,19 +189,86 @@ def parse_ics_schedule(s3_bucket: str) -> List[Dict[str, Any]]:
         # Sort by start time
         matches.sort(key=lambda x: x['start_time'])
 
-        print(f"Total matches found in next 48 hours: {len(matches)}")
+        print(f"Total matches found: {len(matches)}")
         return matches
 
     except Exception as e:
         print(f"Error parsing ICS schedule: {e}")
-        # Don't fail completely - return empty list to allow cleanup to proceed
         return []
+
+
+def evaluate_match_window(matches: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Evaluate if we're currently in a match window that requires 2-minute polling.
+
+    Enable polling if:
+    - Any match starts in next 15 minutes, OR
+    - Any match is currently active (between window_start and window_end)
+
+    Args:
+        matches: List of match dictionaries from parse_ics_schedule
+
+    Returns:
+        Dict with 'is_active' bool, 'reason' string, and lists of active/upcoming matches
+    """
+    london_tz = zoneinfo.ZoneInfo('Europe/London')
+    now = datetime.now(london_tz)
+
+    active_matches = []
+    upcoming_matches = []
+
+    for match in matches:
+        start_time = datetime.fromisoformat(match['start_time'])
+        window_start = datetime.fromisoformat(match['window_start'])
+        window_end = datetime.fromisoformat(match['window_end'])
+
+        # Check if match is currently active (we're in the match window)
+        if window_start <= now <= window_end:
+            active_matches.append({
+                'summary': match['summary'],
+                'start_time': match['start_time'],
+                'status': 'active'
+            })
+
+        # Check if match starts in next 15 minutes
+        time_until_start = (start_time - now).total_seconds() / 60
+        if 0 <= time_until_start <= 15:
+            upcoming_matches.append({
+                'summary': match['summary'],
+                'start_time': match['start_time'],
+                'minutes_until_start': round(time_until_start, 1)
+            })
+
+    # Determine if window is active
+    if active_matches:
+        return {
+            'is_active': True,
+            'reason': f'{len(active_matches)} active match(es): {", ".join(m["summary"] for m in active_matches)}',
+            'active_matches': active_matches,
+            'upcoming_matches': upcoming_matches
+        }
+    elif upcoming_matches:
+        return {
+            'is_active': True,
+            'reason': f'{len(upcoming_matches)} match(es) starting in next 15 min: {", ".join(m["summary"] for m in upcoming_matches)}',
+            'active_matches': active_matches,
+            'upcoming_matches': upcoming_matches
+        }
+    else:
+        return {
+            'is_active': False,
+            'reason': 'No active or upcoming matches in next 15 minutes',
+            'active_matches': [],
+            'upcoming_matches': []
+        }
 
 
 def get_ics_content(s3_bucket: str) -> bytes:
     """
     Get ICS content from S3 cache or fetch fresh from source.
-    Similar to logic in live_match_fetcher but simplified.
+
+    Cache duration: 29 hours (creates daily rotation with some overlap)
+    Rationale: EPL fixture schedules change at least a week in advance
     """
     try:
         # Try S3 cache first
@@ -208,10 +276,12 @@ def get_ics_content(s3_bucket: str) -> bytes:
         last_modified = response['LastModified']
         now = datetime.now(timezone.utc)
 
-        # Use cache if less than 6 hours old (fresher than live_match_fetcher's 29h)
-        if (now - last_modified.replace(tzinfo=timezone.utc)).total_seconds() < 21600:
+        # Use cache if less than 29 hours old (104400 seconds)
+        if (now - last_modified.replace(tzinfo=timezone.utc)).total_seconds() < 104400:
             print("Using cached ICS data from S3")
             return response['Body'].read()
+        else:
+            print("Cached ICS data is stale (>29h old), fetching fresh")
     except Exception as cache_error:
         print(f"Could not retrieve cached ICS: {cache_error}")
 
@@ -230,56 +300,40 @@ def get_ics_content(s3_bucket: str) -> bytes:
         Body=ics_content,
         ContentType='text/calendar'
     )
+    print("Updated S3 cache with fresh ICS data")
 
     return ics_content
 
 
-def create_rule_name(match_summary: str, start_time: datetime) -> str:
+
+
+def manage_polling_rule(window_status: Dict[str, Any], matches: List[Dict[str, Any]], environment: str) -> Dict[str, Any]:
     """
-    Create a consistent rule name for EventBridge rules.
+    Enable or disable the 2-minute polling rule based on match window status.
 
-    Format: epl-dynamic-match-YYYYMMDD-HHMM-{team-summary}
+    Args:
+        window_status: Result from evaluate_match_window
+        matches: List of all matches for context
+        environment: 'dev' or 'prod'
+
+    Returns:
+        Dict with rule state and details
     """
-    # Clean up match summary for rule name
-    clean_summary = ''.join(c for c in str(match_summary) if c.isalnum() or c in ['-', ' '])
-    clean_summary = clean_summary.replace(' ', '-').lower()[:30]  # Limit length
-
-    time_str = start_time.strftime('%Y%m%d-%H%M')
-    return f"epl-dynamic-match-{time_str}-{clean_summary}"
-
-
-def create_match_rules(matches: List[Dict[str, Any]], environment: str) -> List[Dict[str, Any]]:
-    """
-    Create EventBridge rules for upcoming match coverage.
-
-    EPLF-52 Fix: Create a single recurring 2-minute rule that runs continuously
-    when matches are present, letting live_match_fetcher's existing logic handle match detection.
-
-    This replaces the broken approach of creating single-trigger rules per match window.
-    """
-    created_rules = []
-
     try:
-        # Always create/update the recurring rule, regardless of matches
         rule_name = f"epl-live-match-monitor-{environment}"
         recurring_cron = "cron(*/2 * * * ? *)"  # Every 2 minutes
 
-        if matches:
-            # Enable the rule when matches are upcoming
+        # Determine rule state based on window status
+        if window_status['is_active']:
             rule_state = 'ENABLED'
-            description = f"EPL Live Match Monitor - Runs every 2 minutes - ENABLED for {len(matches)} upcoming matches"
-            print(f"🔄 Creating/updating recurring 2-minute rule (ENABLED)")
-            print(f"  Matches to monitor: {len(matches)}")
+            description = f"EPL Live Match Monitor - ENABLED: {window_status['reason']}"
+            print(f"🟢 Enabling 2-minute polling rule")
+            print(f"   Reason: {window_status['reason']}")
         else:
-            # Disable the rule when no matches are upcoming
             rule_state = 'DISABLED'
-            description = f"EPL Live Match Monitor - Runs every 2 minutes - DISABLED (no upcoming matches)"
-            print(f"⏸️ Creating/updating recurring 2-minute rule (DISABLED)")
-            print(f"  No upcoming matches - rule will be disabled")
-
-        print(f"  Rule name: {rule_name}")
-        print(f"  Cron expression: {recurring_cron}")
-        print(f"  State: {rule_state}")
+            description = f"EPL Live Match Monitor - DISABLED: {window_status['reason']}"
+            print(f"🔴 Disabling 2-minute polling rule")
+            print(f"   Reason: {window_status['reason']}")
 
         # Create/update EventBridge rule
         rule_response = events.put_rule(
@@ -289,16 +343,20 @@ def create_match_rules(matches: List[Dict[str, Any]], environment: str) -> List[
             State=rule_state
         )
 
-        # Add target (LiveMatchFetcher function) - always add target even when disabled
+        # Add target (LiveMatchFetcher function)
         live_fetcher_arn = f"arn:aws:lambda:{region}:{get_account_id()}:function:epl-live-fetcher-{environment}"
 
-        # Create input payload with upcoming matches context
+        # Create input payload with match context
         input_payload = {
-            'source': 'schedule-manager-recurring',
-            'upcoming_matches': matches,
+            'source': 'schedule-manager',
             'dynamic_scheduling': True,
-            'monitor_mode': 'continuous',
-            'matches_count': len(matches)
+            'window_active': window_status['is_active'],
+            'active_matches': window_status.get('active_matches', []),
+            'upcoming_matches': window_status.get('upcoming_matches', []),
+            'match_info': {
+                'summary': window_status['reason'],
+                'window_status': 'active' if window_status['is_active'] else 'inactive'
+            }
         }
 
         events.put_targets(
@@ -310,95 +368,23 @@ def create_match_rules(matches: List[Dict[str, Any]], environment: str) -> List[
             }]
         )
 
-        created_rule = {
+        print(f"✅ Successfully {'enabled' if rule_state == 'ENABLED' else 'disabled'} rule: {rule_name}")
+
+        return {
+            'state': rule_state,
             'rule_name': rule_name,
             'rule_arn': rule_response['RuleArn'],
-            'match_summary': f"Recurring monitor - {len(matches)} matches",
-            'cron_expression': recurring_cron,
-            'matches_covered': len(matches),
-            'monitor_type': 'continuous_2min',
-            'state': rule_state
-        }
-
-        created_rules.append(created_rule)
-        print(f"✅ {'Enabled' if rule_state == 'ENABLED' else 'Disabled'} recurring rule: {rule_name}")
-
-    except Exception as e:
-        print(f"❌ Error creating/updating recurring monitor rule: {e}")
-
-    return created_rules
-
-
-def create_cron_expression(dt: datetime) -> str:
-    """
-    Create AWS EventBridge cron expression from datetime.
-
-    Format: cron(minute hour day month ? year)
-    """
-    # Convert to UTC for EventBridge
-    dt_utc = dt.astimezone(timezone.utc)
-    return f"cron({dt_utc.minute} {dt_utc.hour} {dt_utc.day} {dt_utc.month} ? {dt_utc.year})"
-
-
-def cleanup_old_rules(environment: str) -> Dict[str, Any]:
-    """
-    Clean up expired EventBridge rules to prevent accumulation.
-
-    Removes rules that are more than 24 hours old.
-    """
-    try:
-        # List all rules with our naming pattern
-        response = events.list_rules(NamePrefix='epl-dynamic-match-')
-        rules = response.get('Rules', [])
-
-        deleted_count = 0
-        errors = []
-
-        for rule in rules:
-            rule_name = rule['Name']
-
-            try:
-                # Extract date from rule name (format: epl-dynamic-match-YYYYMMDD-HHMM-...)
-                parts = rule_name.split('-')
-                if len(parts) >= 5:
-                    date_str = parts[3]  # YYYYMMDD
-                    time_str = parts[4]  # HHMM
-
-                    # Parse rule date
-                    rule_date = datetime.strptime(f"{date_str}-{time_str}", '%Y%m%d-%H%M')
-                    rule_date = rule_date.replace(tzinfo=timezone.utc)
-
-                    # Delete if more than 24 hours old
-                    if (datetime.now(timezone.utc) - rule_date).total_seconds() > 86400:
-                        print(f"Deleting expired rule: {rule_name}")
-
-                        # Remove targets first
-                        events.remove_targets(Rule=rule_name, Ids=['1'])
-
-                        # Delete rule
-                        events.delete_rule(Name=rule_name)
-                        deleted_count += 1
-
-            except Exception as rule_error:
-                print(f"Error processing rule {rule_name}: {rule_error}")
-                errors.append(str(rule_error))
-                continue
-
-        print(f"Cleanup complete: deleted {deleted_count} expired rules")
-
-        return {
-            'rules_deleted': deleted_count,
-            'errors': errors,
-            'total_rules_found': len(rules)
+            'reason': window_status['reason']
         }
 
     except Exception as e:
-        print(f"Error during cleanup: {e}")
+        print(f"❌ Error managing polling rule: {e}")
         return {
-            'rules_deleted': 0,
-            'errors': [str(e)],
-            'total_rules_found': 0
+            'state': 'ERROR',
+            'error': str(e)
         }
+
+
 
 
 def store_schedule_state(table, schedule_state: Dict[str, Any]) -> None:

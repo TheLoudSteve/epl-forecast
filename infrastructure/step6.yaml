@@ -641,13 +641,13 @@ Resources:
       Principal: events.amazonaws.com
       SourceArn: !GetAtt ScheduledDataFetcherRule.Arn
 
-  # EventBridge rule for Schedule Manager (daily at 06:00 UTC)
+  # EventBridge rule for Schedule Manager (every 15 minutes)
   ScheduleManagerRule:
     Type: AWS::Events::Rule
     Properties:
       Name: !Sub 'epl-schedule-manager-${Environment}'
-      Description: 'Trigger Schedule Manager daily to create dynamic match rules'
-      ScheduleExpression: 'cron(0 6 * * ? *)'
+      Description: 'Trigger Schedule Manager every 15 minutes for precise match window control'
+      ScheduleExpression: 'cron(*/15 * * * ? *)'
       State: ENABLED
       Targets:
         - Arn: !GetAtt ScheduleManagerFunction.Arn
