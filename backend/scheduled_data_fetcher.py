@@ -5,6 +5,12 @@ import requests
 from datetime import datetime, timezone
 from typing import Dict, List, Any
 from decimal import Decimal
+from tenacity import retry, stop_after_attempt, wait_exponential, RetryError, after_log, before_sleep_log
+import logging
+
+# Set up logging for retry tracking
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 from forecast_history import forecast_history_manager
 from notification_logic import notification_manager
 
@@ -112,9 +118,24 @@ def lambda_handler(event, context):
             })
         }
 
+def _log_retry_attempt(retry_state):
+    """Callback to log and track retry attempts in New Relic."""
+    attempt_number = retry_state.attempt_number
+    print(f"Retrying football-data.org API call (attempt {attempt_number}/3)...")
+    if NEW_RELIC_ENABLED:
+        newrelic.agent.record_custom_metric('Custom/FootballDataAPI/RetryAttempt', 1)
+        newrelic.agent.add_custom_attribute('football_data_api.retry_attempt', attempt_number)
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    before_sleep=_log_retry_attempt,
+    reraise=True
+)
 def fetch_epl_data(api_key: str) -> Dict[str, Any]:
     """
-    Fetch current EPL standings from football-data.org API
+    Fetch current EPL standings from football-data.org API with retry logic.
+    Retries up to 3 times with exponential backoff (2s, 4s, 8s).
     """
     url = "https://api.football-data.org/v4/competitions/PL/standings"
 
