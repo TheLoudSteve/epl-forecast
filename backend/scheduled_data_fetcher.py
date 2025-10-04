@@ -14,33 +14,17 @@ logger.setLevel(logging.INFO)
 from forecast_history import forecast_history_manager
 from notification_logic import notification_manager
 
-# New Relic monitoring
+# New Relic monitoring - handled by Lambda Layer wrapper
 try:
     import newrelic.agent
-    print("New Relic agent imported successfully")
-    # Initialize if environment variables are set
-    if os.environ.get('NEW_RELIC_LICENSE_KEY'):
-        print("NEW_RELIC_LICENSE_KEY found, initializing New Relic agent...")
-        # For Lambda, we need to initialize without config file and rely on env vars
-        newrelic.agent.initialize(config_file=None, environment='production')
-        NEW_RELIC_ENABLED = True
-        print(f"New Relic agent initialized successfully for app: {os.environ.get('NEW_RELIC_APP_NAME', 'EPL-Forecast-Lambda')}")
-        print(f"New Relic Account ID: {os.environ.get('NEW_RELIC_ACCOUNT_ID', 'Not Set')}")
-    else:
-        print("NEW_RELIC_LICENSE_KEY not found, New Relic disabled")
-        NEW_RELIC_ENABLED = False
-except ImportError as e:
-    print(f"Failed to import New Relic agent: {e}")
-    NEW_RELIC_ENABLED = False
-except Exception as e:
-    print(f"Error initializing New Relic agent: {e}")
+    NEW_RELIC_ENABLED = True
+except ImportError:
     NEW_RELIC_ENABLED = False
 
 # Use the region from environment or default to us-east-1 for backward compatibility
 region = os.environ.get('AWS_REGION', 'us-east-1')
 dynamodb = boto3.resource('dynamodb', region_name=region)
 
-# @newrelic.agent.lambda_handler if NEW_RELIC_ENABLED else lambda x: x
 def lambda_handler(event, context):
     """
     Lambda function to fetch EPL data on schedule (1x daily at 00:00 UTC)
