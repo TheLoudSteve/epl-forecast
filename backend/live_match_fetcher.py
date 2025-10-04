@@ -137,8 +137,11 @@ def _log_retry_attempt(retry_state):
     attempt_number = retry_state.attempt_number
     print(f"Retrying football-data.org API call (attempt {attempt_number}/3)...")
     if NEW_RELIC_ENABLED:
-        newrelic.agent.record_custom_metric('Custom/FootballDataAPI/RetryAttempt', 1)
-        newrelic.agent.add_custom_attribute('football_data_api.retry_attempt', attempt_number)
+        newrelic.agent.record_custom_event('FootballAPIRetry', {
+            'attempt_number': attempt_number,
+            'max_attempts': 3,
+            'context': 'live_match'
+        })
 
 @retry(
     stop=stop_after_attempt(3),
@@ -160,11 +163,9 @@ def fetch_epl_data(api_key: str, match_context: str = "") -> Dict[str, Any]:
     print(f"Calling football-data.org API for match data: {url}")
     print(f"Match context: {match_context}")
 
-    # Record New Relic custom metric for API call
+    # Record New Relic custom attributes for API call
     environment = os.environ.get('ENVIRONMENT', 'unknown')
     if NEW_RELIC_ENABLED:
-        newrelic.agent.record_custom_metric('Custom/FootballDataAPI/CallMade', 1)
-        newrelic.agent.record_custom_metric('Custom/FootballDataAPI/MatchCall', 1)
         newrelic.agent.add_custom_attribute('football_data_api.call_reason', 'match_update')
         newrelic.agent.add_custom_attribute('football_data_api.environment', environment)
         newrelic.agent.add_custom_attribute('football_data_api.match_context', match_context)
@@ -177,10 +178,16 @@ def fetch_epl_data(api_key: str, match_context: str = "") -> Dict[str, Any]:
     print(f"API Response Status: {response.status_code}")
     print(f"API Response Time: {response_time_ms:.2f}ms")
 
-    # Record response metrics
+    # Record response event
     if NEW_RELIC_ENABLED:
-        newrelic.agent.record_custom_metric('Custom/FootballDataAPI/ResponseTime', response_time_ms)
-        newrelic.agent.record_custom_metric(f'Custom/FootballDataAPI/StatusCode/{response.status_code}', 1)
+        newrelic.agent.record_custom_event('FootballAPICall', {
+            'response_status': response.status_code,
+            'response_time_ms': response_time_ms,
+            'call_reason': 'match_update',
+            'environment': environment,
+            'match_context': match_context,
+            'api_url': url
+        })
         newrelic.agent.add_custom_attribute('football_data_api.response_status', response.status_code)
         newrelic.agent.add_custom_attribute('football_data_api.response_time_ms', response_time_ms)
 
@@ -189,7 +196,7 @@ def fetch_epl_data(api_key: str, match_context: str = "") -> Dict[str, Any]:
     data = response.json()
     print(f"API Response Data keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
 
-    # Record successful API call metrics
+    # Add teams count as custom attribute
     if NEW_RELIC_ENABLED:
         # football-data.org returns: {"standings": [{"type": "TOTAL", "table": [...]}]}
         teams_count = 0
@@ -199,7 +206,6 @@ def fetch_epl_data(api_key: str, match_context: str = "") -> Dict[str, Any]:
                 if standing.get('type') == 'TOTAL':
                     teams_count = len(standing.get('table', []))
                     break
-        newrelic.agent.record_custom_metric('Custom/FootballDataAPI/TeamsReturned', teams_count)
         newrelic.agent.add_custom_attribute('football_data_api.teams_count', teams_count)
 
     return data
