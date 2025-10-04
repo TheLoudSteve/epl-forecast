@@ -6,10 +6,10 @@ Parameters:
     Type: String
     AllowedValues: [dev, prod]
     Description: Environment name
-  RapidAPIKey:
+  FootballDataAPIKey:
     Type: String
     NoEcho: true
-    Description: RapidAPI key for football data
+    Description: football-data.org API key
   NewRelicAccountId:
     Type: String
     Description: New Relic account ID for Lambda monitoring
@@ -258,7 +258,7 @@ Resources:
           DYNAMODB_TABLE: !Ref EPLDataTable
           USER_PREFERENCES_TABLE: !Ref UserPreferencesTable
           FORECAST_HISTORY_TABLE: !Ref ForecastHistoryTable
-          RAPIDAPI_KEY: !Ref RapidAPIKey
+          FOOTBALL_DATA_API_KEY: !Ref FootballDataAPIKey
           SNS_TOPIC_ARN: !Ref PushNotificationTopic
           APNS_PLATFORM_ARN: !If 
             - EnableAPNS 
@@ -295,7 +295,7 @@ Resources:
           USER_PREFERENCES_TABLE: !Ref UserPreferencesTable
           FORECAST_HISTORY_TABLE: !Ref ForecastHistoryTable
           S3_BUCKET: !Ref ICSCacheBucket
-          RAPIDAPI_KEY: !Ref RapidAPIKey
+          FOOTBALL_DATA_API_KEY: !Ref FootballDataAPIKey
           SNS_TOPIC_ARN: !Ref PushNotificationTopic
           APNS_PLATFORM_ARN: !If 
             - EnableAPNS 

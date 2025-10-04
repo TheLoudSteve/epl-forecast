@@ -55,7 +55,7 @@ def lambda_handler(event, context):
             newrelic.agent.add_custom_attribute('lambda.environment', os.environ.get('ENVIRONMENT', 'unknown'))
 
         table_name = os.environ['DYNAMODB_TABLE']
-        rapidapi_key = os.environ['RAPIDAPI_KEY']
+        football_data_api_key = os.environ['FOOTBALL_DATA_API_KEY']
 
         print(f"Environment variables - Table: {table_name}")
 
@@ -74,8 +74,8 @@ def lambda_handler(event, context):
         table = dynamodb.Table(table_name)
 
         # Fetch fresh EPL data
-        print("Fetching fresh EPL data from RapidAPI")
-        epl_data = fetch_epl_data(rapidapi_key, match_context)
+        print("Fetching fresh EPL data from football-data.org")
+        epl_data = fetch_epl_data(football_data_api_key, match_context)
         print(f"Fetched EPL data with {len(epl_data.get('table', []))} teams")
 
         # Calculate forecasts
@@ -132,32 +132,30 @@ def lambda_handler(event, context):
         }
 
 
-def fetch_epl_data(rapidapi_key: str, match_context: str = "") -> Dict[str, Any]:
+def fetch_epl_data(api_key: str, match_context: str = "") -> Dict[str, Any]:
     """
-    Fetch current EPL table from RapidAPI
+    Fetch current EPL standings from football-data.org API
     """
-    url = "https://football-web-pages1.p.rapidapi.com/league-table.json"
-    querystring = {"comp": "1", "team": "1"}
+    url = "https://api.football-data.org/v4/competitions/PL/standings"
 
     headers = {
-        "X-RapidAPI-Key": rapidapi_key,
-        "X-RapidAPI-Host": "football-web-pages1.p.rapidapi.com"
+        "X-Auth-Token": api_key
     }
 
-    print(f"Calling RapidAPI for match data: {url}")
+    print(f"Calling football-data.org API for match data: {url}")
     print(f"Match context: {match_context}")
 
-    # Record New Relic custom metric for RapidAPI call
+    # Record New Relic custom metric for API call
     environment = os.environ.get('ENVIRONMENT', 'unknown')
     if NEW_RELIC_ENABLED:
-        newrelic.agent.record_custom_metric('Custom/RapidAPI/CallMade', 1)
-        newrelic.agent.record_custom_metric('Custom/RapidAPI/MatchCall', 1)
-        newrelic.agent.add_custom_attribute('rapidapi.call_reason', 'match_update')
-        newrelic.agent.add_custom_attribute('rapidapi.environment', environment)
-        newrelic.agent.add_custom_attribute('rapidapi.match_context', match_context)
+        newrelic.agent.record_custom_metric('Custom/FootballDataAPI/CallMade', 1)
+        newrelic.agent.record_custom_metric('Custom/FootballDataAPI/MatchCall', 1)
+        newrelic.agent.add_custom_attribute('football_data_api.call_reason', 'match_update')
+        newrelic.agent.add_custom_attribute('football_data_api.environment', environment)
+        newrelic.agent.add_custom_attribute('football_data_api.match_context', match_context)
 
     start_time = datetime.now(timezone.utc)
-    response = requests.get(url, headers=headers, params=querystring, timeout=30)
+    response = requests.get(url, headers=headers, timeout=30)
     end_time = datetime.now(timezone.utc)
     response_time_ms = (end_time - start_time).total_seconds() * 1000
 
@@ -166,10 +164,10 @@ def fetch_epl_data(rapidapi_key: str, match_context: str = "") -> Dict[str, Any]
 
     # Record response metrics
     if NEW_RELIC_ENABLED:
-        newrelic.agent.record_custom_metric('Custom/RapidAPI/ResponseTime', response_time_ms)
-        newrelic.agent.record_custom_metric(f'Custom/RapidAPI/StatusCode/{response.status_code}', 1)
-        newrelic.agent.add_custom_attribute('rapidapi.response_status', response.status_code)
-        newrelic.agent.add_custom_attribute('rapidapi.response_time_ms', response_time_ms)
+        newrelic.agent.record_custom_metric('Custom/FootballDataAPI/ResponseTime', response_time_ms)
+        newrelic.agent.record_custom_metric(f'Custom/FootballDataAPI/StatusCode/{response.status_code}', 1)
+        newrelic.agent.add_custom_attribute('football_data_api.response_status', response.status_code)
+        newrelic.agent.add_custom_attribute('football_data_api.response_time_ms', response_time_ms)
 
     response.raise_for_status()
 
@@ -178,66 +176,90 @@ def fetch_epl_data(rapidapi_key: str, match_context: str = "") -> Dict[str, Any]
 
     # Record successful API call metrics
     if NEW_RELIC_ENABLED:
-        teams_count = len(data.get('league-table', {}).get('teams', []))
-        if teams_count == 0 and 'table' in data:
-            teams_count = len(data.get('table', []))
-        newrelic.agent.record_custom_metric('Custom/RapidAPI/TeamsReturned', teams_count)
-        newrelic.agent.add_custom_attribute('rapidapi.teams_count', teams_count)
+        # football-data.org returns: {"standings": [{"type": "TOTAL", "table": [...]}]}
+        teams_count = 0
+        if 'standings' in data and len(data['standings']) > 0:
+            # Find the TOTAL standings (as opposed to HOME/AWAY)
+            for standing in data['standings']:
+                if standing.get('type') == 'TOTAL':
+                    teams_count = len(standing.get('table', []))
+                    break
+        newrelic.agent.record_custom_metric('Custom/FootballDataAPI/TeamsReturned', teams_count)
+        newrelic.agent.add_custom_attribute('football_data_api.teams_count', teams_count)
 
     return data
 
 def calculate_forecasts(epl_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Calculate forecasted final table based on points per game
+
+    football-data.org API structure:
+    {
+        "standings": [
+            {
+                "type": "TOTAL",
+                "table": [
+                    {
+                        "position": 1,
+                        "team": {"name": "Arsenal", ...},
+                        "playedGames": 10,
+                        "won": 7,
+                        "draw": 2,
+                        "lost": 1,
+                        "points": 23,
+                        "goalsFor": 20,
+                        "goalsAgainst": 10,
+                        "goalDifference": 10
+                    }
+                ]
+            }
+        ]
+    }
     """
     teams = []
-    
-    # Extract team data from API response
-    table_data = epl_data.get('league-table', {}).get('teams', [])
-    
-    if not table_data:
-        # Try alternative key structures
-        if 'table' in epl_data:
-            table_data = epl_data.get('table', [])
-        elif 'standings' in epl_data:
-            table_data = epl_data.get('standings', [])
-    
+
+    # Extract TOTAL standings table from football-data.org response
+    table_data = []
+    if 'standings' in epl_data:
+        for standing in epl_data['standings']:
+            if standing.get('type') == 'TOTAL':
+                table_data = standing.get('table', [])
+                break
+
     for team_data in table_data:
-        # Extract data from the correct API structure
-        all_matches = team_data.get('all-matches', {})
-        played = all_matches.get('played', 0)
-        points = team_data.get('total-points', 0)
-        
+        played = team_data.get('playedGames', 0)
+        points = team_data.get('points', 0)
+
         if played > 0:
             points_per_game = points / played
             forecasted_points = points_per_game * 38
         else:
             points_per_game = 0
             forecasted_points = 0
-        
+
         team = {
-            'name': team_data.get('name', ''),
+            'name': team_data.get('team', {}).get('name', ''),
             'played': played,
-            'won': all_matches.get('won', 0),
-            'drawn': all_matches.get('drawn', 0),
-            'lost': all_matches.get('lost', 0),
-            'for': all_matches.get('for', 0),
-            'against': all_matches.get('against', 0),
-            'goal_difference': all_matches.get('goal-difference', 0),
+            'won': team_data.get('won', 0),
+            'drawn': team_data.get('draw', 0),  # Note: API uses 'draw' not 'drawn'
+            'lost': team_data.get('lost', 0),
+            'for': team_data.get('goalsFor', 0),
+            'against': team_data.get('goalsAgainst', 0),
+            'goal_difference': team_data.get('goalDifference', 0),
             'points': points,
             'points_per_game': Decimal(str(round(points_per_game, 2))),
             'forecasted_points': Decimal(str(round(forecasted_points, 1))),
             'current_position': team_data.get('position', 0)
         }
         teams.append(team)
-    
+
     # Sort by forecasted points (descending), then by goal difference, then by goals for
     teams.sort(key=lambda x: (-x['forecasted_points'], -x['goal_difference'], -x['for']))
-    
+
     # Add forecasted position
     for i, team in enumerate(teams):
         team['forecasted_position'] = i + 1
-    
+
     return {
         'teams': teams,
         'last_updated': datetime.now(timezone.utc).isoformat(),
@@ -249,8 +271,9 @@ def store_data(table, data: Dict[str, Any]) -> None:
     """
     Store forecast data in DynamoDB
     """
-    # Store with TTL of 24 hours
-    ttl = int((datetime.now(timezone.utc).timestamp() + 86400))
+    # Store with TTL of 7 days (604800 seconds)
+    # Provides safety buffer - data refreshes 2x daily but won't expire if there are issues
+    ttl = int((datetime.now(timezone.utc).timestamp() + 604800))
     
     table.put_item(
         Item={

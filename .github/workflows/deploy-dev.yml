@@ -43,8 +43,8 @@ jobs:
         # Check we have all required secrets
         MISSING_PARAMS=""
         
-        if [ -z "${{ secrets.RAPIDAPI_KEY }}" ]; then
-          MISSING_PARAMS="$MISSING_PARAMS RapidAPIKey"
+        if [ -z "${{ secrets.FOOTBALL_DATA_API_KEY }}" ]; then
+          MISSING_PARAMS="$MISSING_PARAMS FootballDataAPIKey"
         fi
         
         if [ -z "${{ secrets.NEW_RELIC_ACCOUNT_ID }}" ]; then
@@ -129,7 +129,7 @@ jobs:
           --template-body file://infrastructure/step6.yaml \
           --parameters \
             ParameterKey=Environment,ParameterValue=${{ env.ENVIRONMENT }} \
-            ParameterKey=RapidAPIKey,ParameterValue=${{ secrets.RAPIDAPI_KEY }} \
+            ParameterKey=FootballDataAPIKey,ParameterValue=${{ secrets.FOOTBALL_DATA_API_KEY }} \
             ParameterKey=NewRelicAccountId,ParameterValue=${{ secrets.NEW_RELIC_ACCOUNT_ID }} \
             ParameterKey=NewRelicLicenseKey,ParameterValue=${{ secrets.NEW_RELIC_LICENSE_KEY }} \
             ParameterKey=APNSPlatformApplicationArn,ParameterValue= \
@@ -151,7 +151,7 @@ jobs:
             --template-body file://infrastructure/step6.yaml \
             --parameters \
               ParameterKey=Environment,ParameterValue=${{ env.ENVIRONMENT }} \
-              ParameterKey=RapidAPIKey,ParameterValue=${{ secrets.RAPIDAPI_KEY }} \
+              ParameterKey=FootballDataAPIKey,ParameterValue=${{ secrets.FOOTBALL_DATA_API_KEY }} \
               ParameterKey=NewRelicAccountId,ParameterValue=${{ secrets.NEW_RELIC_ACCOUNT_ID }} \
               ParameterKey=NewRelicLicenseKey,ParameterValue=${{ secrets.NEW_RELIC_LICENSE_KEY }} \
               ParameterKey=APNSPlatformApplicationArn,ParameterValue= \
