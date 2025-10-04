@@ -54,7 +54,7 @@ EPL Forecast is an iOS app with AWS backend that provides English Premier League
   - Runs every 2 minutes in production only
   - Only calls RapidAPI if live matches detected (15min before to 30min after match)
   - Uses ICS feed parsing for match detection
-- **Expected Usage**: 2 calls/day (dev), 2-8 calls/match day (prod)
+- **Expected Usage**: 1 call/day baseline + ~83 calls per match during live games
 
 ## New Relic Integration
 

@@ -620,13 +620,13 @@ Resources:
       RestApiId: !Ref EPLForecastAPI
       StageName: !Ref Environment
 
-  # EventBridge rule for scheduled data fetcher (2x daily at 00:00 and 12:00 UTC)
+  # EventBridge rule for scheduled data fetcher (1x daily at 00:00 UTC)
   ScheduledDataFetcherRule:
     Type: AWS::Events::Rule
     Properties:
       Name: !Sub 'epl-scheduled-fetcher-${Environment}'
-      Description: 'Trigger EPL scheduled data fetcher at 00:00 and 12:00 UTC'
-      ScheduleExpression: 'cron(0 0,12 * * ? *)'
+      Description: 'Trigger EPL scheduled data fetcher at 00:00 UTC daily'
+      ScheduleExpression: 'cron(0 0 * * ? *)'
       State: ENABLED
       Targets:
         - Arn: !GetAtt ScheduledDataFetcherFunction.Arn

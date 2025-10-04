@@ -37,7 +37,7 @@ dynamodb = boto3.resource('dynamodb', region_name=region)
 # @newrelic.agent.lambda_handler if NEW_RELIC_ENABLED else lambda x: x
 def lambda_handler(event, context):
     """
-    Lambda function to fetch EPL data on schedule (2x daily at 00:00 and 12:00 UTC)
+    Lambda function to fetch EPL data on schedule (1x daily at 00:00 UTC)
     This ensures fresh data is always available and prevents DynamoDB TTL expiration
     """
     try:
