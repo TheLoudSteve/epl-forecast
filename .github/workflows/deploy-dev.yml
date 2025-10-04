@@ -439,7 +439,7 @@ jobs:
           notification_rate_limiter.py \
           push_notification_service.py \
           boto3* requests* dateutil* six* urllib3* botocore* jmespath* s3transfer* \
-          certifi* charset_normalizer* idna* newrelic* icalendar*
+          certifi* charset_normalizer* idna* newrelic* icalendar* tenacity*
         
         # Package API handler
         zip -r api_handler.zip \
