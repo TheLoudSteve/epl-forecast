@@ -30,8 +30,13 @@ def lambda_handler(event, context):
     Lambda function to fetch EPL data on schedule (1x daily at 00:00 UTC)
     This ensures fresh data is always available and prevents DynamoDB TTL expiration
     """
-    # Initialize New Relic agent and create application
+    # Initialize New Relic agent with environment variables (no config file needed)
     if NEW_RELIC_ENABLED:
+        settings = newrelic.agent.global_settings()
+        settings.license_key = os.environ.get('NEW_RELIC_LICENSE_KEY')
+        settings.app_name = os.environ.get('NEW_RELIC_APP_NAME')
+        settings.distributed_tracing.enabled = True
+
         newrelic.agent.initialize()
         application = newrelic.agent.application()
 
