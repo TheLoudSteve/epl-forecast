@@ -30,13 +30,6 @@ def _get_notification_manager():
         from notification_logic import notification_manager
     return notification_manager
 
-# New Relic monitoring
-try:
-    import newrelic.agent
-    NEW_RELIC_ENABLED = True
-except ImportError:
-    NEW_RELIC_ENABLED = False
-
 # Use the region from environment or default to us-east-1 for backward compatibility
 region = os.environ.get('AWS_REGION', 'us-east-1')
 dynamodb = boto3.resource('dynamodb', region_name=region)
@@ -47,26 +40,8 @@ def lambda_handler(event, context):
     Lambda function triggered by Schedule Manager when matches are scheduled.
     Directly fetches EPL data and updates forecasts - no ICS parsing needed.
     """
-    # Initialize New Relic agent and create application
-    if NEW_RELIC_ENABLED:
-        newrelic.agent.initialize()
-        application = newrelic.agent.application()
-
-        # Wrap execution in background transaction for custom events
-        with newrelic.agent.BackgroundTask(application, name='live_match_update'):
-            return _execute_handler(event, context)
-    else:
-        return _execute_handler(event, context)
-
-def _execute_handler(event, context):
-    """Execute the actual handler logic"""
     try:
         print(f"Match update triggered with event: {event}")
-
-        # Add New Relic custom attributes
-        if NEW_RELIC_ENABLED:
-            newrelic.agent.add_custom_attribute('lambda.event_type', 'scheduled_match_update')
-            newrelic.agent.add_custom_attribute('lambda.environment', os.environ.get('ENVIRONMENT', 'unknown'))
 
         table_name = os.environ['DYNAMODB_TABLE']
         football_data_api_key = os.environ['FOOTBALL_DATA_API_KEY']
@@ -78,11 +53,6 @@ def _execute_handler(event, context):
         match_context = match_info.get('summary', 'Scheduled match')
 
         print(f"Processing scheduled match: {match_context}")
-
-        # Record execution metrics
-        if NEW_RELIC_ENABLED:
-            newrelic.agent.add_custom_attribute('match_context', match_context)
-            newrelic.agent.record_custom_metric('Custom/LiveFetcher/ScheduledExecution', 1)
 
         # Get DynamoDB table
         table = dynamodb.Table(table_name)
@@ -135,8 +105,6 @@ def _execute_handler(event, context):
 
     except Exception as e:
         print(f"Error: {str(e)}")
-        if NEW_RELIC_ENABLED:
-            newrelic.agent.record_exception()
         return {
             'statusCode': 500,
             'body': json.dumps({
@@ -147,15 +115,9 @@ def _execute_handler(event, context):
 
 
 def _log_retry_attempt(retry_state):
-    """Callback to log and track retry attempts in New Relic."""
+    """Callback to log retry attempts."""
     attempt_number = retry_state.attempt_number
     print(f"Retrying football-data.org API call (attempt {attempt_number}/3)...")
-    if NEW_RELIC_ENABLED:
-        newrelic.agent.record_custom_event('FootballAPIRetry', {
-            'attempt_number': attempt_number,
-            'max_attempts': 3,
-            'context': 'live_match'
-        })
 
 @retry(
     stop=stop_after_attempt(3),
@@ -177,13 +139,7 @@ def fetch_epl_data(api_key: str, match_context: str = "") -> Dict[str, Any]:
     print(f"Calling football-data.org API for match data: {url}")
     print(f"Match context: {match_context}")
 
-    # Record New Relic custom attributes for API call
     environment = os.environ.get('ENVIRONMENT', 'unknown')
-    if NEW_RELIC_ENABLED:
-        newrelic.agent.add_custom_attribute('football_data_api.call_reason', 'match_update')
-        newrelic.agent.add_custom_attribute('football_data_api.environment', environment)
-        newrelic.agent.add_custom_attribute('football_data_api.match_context', match_context)
-
     start_time = datetime.now(timezone.utc)
     response = requests.get(url, headers=headers, timeout=30)
     end_time = datetime.now(timezone.utc)
@@ -228,18 +184,6 @@ def fetch_epl_data(api_key: str, match_context: str = "") -> Dict[str, Any]:
 
     data = response.json()
     print(f"API Response Data keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
-
-    # Add teams count as custom attribute
-    if NEW_RELIC_ENABLED:
-        # football-data.org returns: {"standings": [{"type": "TOTAL", "table": [...]}]}
-        teams_count = 0
-        if 'standings' in data and len(data['standings']) > 0:
-            # Find the TOTAL standings (as opposed to HOME/AWAY)
-            for standing in data['standings']:
-                if standing.get('type') == 'TOTAL':
-                    teams_count = len(standing.get('table', []))
-                    break
-        newrelic.agent.add_custom_attribute('football_data_api.teams_count', teams_count)
 
     return data
 

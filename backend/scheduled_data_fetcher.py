@@ -24,31 +24,8 @@ def lambda_handler(event, context):
     Lambda function to fetch EPL data on schedule (1x daily at 00:00 UTC)
     This ensures fresh data is always available and prevents DynamoDB TTL expiration
     """
-    # Initialize New Relic agent with environment variables (no config file needed)
-    if NEW_RELIC_ENABLED:
-        settings = newrelic.agent.global_settings()
-        settings.license_key = os.environ.get('NEW_RELIC_LICENSE_KEY')
-        settings.app_name = os.environ.get('NEW_RELIC_APP_NAME')
-        settings.distributed_tracing.enabled = True
-
-        newrelic.agent.initialize()
-        application = newrelic.agent.application()
-
-        # Wrap execution in background transaction for custom events
-        with newrelic.agent.BackgroundTask(application, name='scheduled_data_fetch'):
-            return _execute_handler(event, context)
-    else:
-        return _execute_handler(event, context)
-
-def _execute_handler(event, context):
-    """Execute the actual handler logic"""
     try:
         print(f"Scheduled data fetch triggered with event: {event}")
-
-        # Add New Relic custom attributes
-        if NEW_RELIC_ENABLED:
-            newrelic.agent.add_custom_attribute('lambda.event_type', 'scheduled_fetch')
-            newrelic.agent.add_custom_attribute('lambda.environment', os.environ.get('ENVIRONMENT', 'unknown'))
         
         table_name = os.environ['DYNAMODB_TABLE']
         football_data_api_key = os.environ['FOOTBALL_DATA_API_KEY']
@@ -143,14 +120,7 @@ def fetch_epl_data(api_key: str) -> Dict[str, Any]:
 
     print(f"Calling football-data.org API: {url}")
 
-    # Record New Relic custom event for API call
     environment = os.environ.get('ENVIRONMENT', 'unknown')
-    if NEW_RELIC_ENABLED:
-        print("Recording New Relic event for football-data.org API call...")
-        newrelic.agent.add_custom_attribute('football_data_api.call_reason', 'scheduled_update')
-        newrelic.agent.add_custom_attribute('football_data_api.environment', environment)
-        print("New Relic attributes added for API call")
-
     start_time = datetime.now(timezone.utc)
     response = requests.get(url, headers=headers, timeout=30)
     end_time = datetime.now(timezone.utc)
@@ -197,18 +167,6 @@ def fetch_epl_data(api_key: str) -> Dict[str, Any]:
     data = response.json()
     print(f"API Response Data keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
     print(f"API Response sample: {str(data)[:500]}...")
-
-    # Add teams count as custom attribute
-    if NEW_RELIC_ENABLED:
-        # football-data.org returns: {"standings": [{"type": "TOTAL", "table": [...]}]}
-        teams_count = 0
-        if 'standings' in data and len(data['standings']) > 0:
-            # Find the TOTAL standings (as opposed to HOME/AWAY)
-            for standing in data['standings']:
-                if standing.get('type') == 'TOTAL':
-                    teams_count = len(standing.get('table', []))
-                    break
-        newrelic.agent.add_custom_attribute('football_data_api.teams_count', teams_count)
 
     return data
 
