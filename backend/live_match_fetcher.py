@@ -40,6 +40,7 @@ except ImportError:
 # Use the region from environment or default to us-east-1 for backward compatibility
 region = os.environ.get('AWS_REGION', 'us-east-1')
 dynamodb = boto3.resource('dynamodb', region_name=region)
+cloudwatch = boto3.client('cloudwatch', region_name=region)
 
 def lambda_handler(event, context):
     """
@@ -191,18 +192,37 @@ def fetch_epl_data(api_key: str, match_context: str = "") -> Dict[str, Any]:
     print(f"API Response Status: {response.status_code}")
     print(f"API Response Time: {response_time_ms:.2f}ms")
 
-    # Record response event
-    if NEW_RELIC_ENABLED:
-        newrelic.agent.record_custom_event('FootballAPICall', {
-            'response_status': response.status_code,
-            'response_time_ms': response_time_ms,
-            'call_reason': 'match_update',
-            'environment': environment,
-            'match_context': match_context,
-            'api_url': url
-        })
-        newrelic.agent.add_custom_attribute('football_data_api.response_status', response.status_code)
-        newrelic.agent.add_custom_attribute('football_data_api.response_time_ms', response_time_ms)
+    # Publish CloudWatch metrics
+    try:
+        cloudwatch.put_metric_data(
+            Namespace='EPLForecast/FootballAPI',
+            MetricData=[
+                {
+                    'MetricName': 'APICallCount',
+                    'Value': 1,
+                    'Unit': 'Count',
+                    'Timestamp': end_time,
+                    'Dimensions': [
+                        {'Name': 'Environment', 'Value': environment},
+                        {'Name': 'StatusCode', 'Value': str(response.status_code)},
+                        {'Name': 'CallReason', 'Value': 'match_update'}
+                    ]
+                },
+                {
+                    'MetricName': 'APIResponseTime',
+                    'Value': response_time_ms,
+                    'Unit': 'Milliseconds',
+                    'Timestamp': end_time,
+                    'Dimensions': [
+                        {'Name': 'Environment', 'Value': environment},
+                        {'Name': 'StatusCode', 'Value': str(response.status_code)}
+                    ]
+                }
+            ]
+        )
+        print(f"Published CloudWatch metrics: status={response.status_code}, time={response_time_ms:.2f}ms")
+    except Exception as e:
+        print(f"Failed to publish CloudWatch metrics: {e}")
 
     response.raise_for_status()
 
