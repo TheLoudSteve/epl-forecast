@@ -182,6 +182,14 @@ Resources:
                 Resource:
                   - !Sub 'arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/epl-match-*'
                   - !Sub 'arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/epl-dynamic-match-*'
+        - PolicyName: CloudWatchMetricsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: '*'
 
   # IAM role for New Relic AWS integration (API polling)
   NewRelicInfrastructureRole:
