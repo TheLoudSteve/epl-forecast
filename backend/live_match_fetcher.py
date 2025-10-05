@@ -46,10 +46,19 @@ def lambda_handler(event, context):
     Lambda function triggered by Schedule Manager when matches are scheduled.
     Directly fetches EPL data and updates forecasts - no ICS parsing needed.
     """
-    # Initialize New Relic agent here where env vars are available
+    # Initialize New Relic agent and create application
     if NEW_RELIC_ENABLED:
         newrelic.agent.initialize()
+        application = newrelic.agent.application()
 
+        # Wrap execution in background transaction for custom events
+        with newrelic.agent.BackgroundTask(application, name='live_match_update'):
+            return _execute_handler(event, context)
+    else:
+        return _execute_handler(event, context)
+
+def _execute_handler(event, context):
+    """Execute the actual handler logic"""
     try:
         print(f"Match update triggered with event: {event}")
 

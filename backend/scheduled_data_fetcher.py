@@ -30,10 +30,19 @@ def lambda_handler(event, context):
     Lambda function to fetch EPL data on schedule (1x daily at 00:00 UTC)
     This ensures fresh data is always available and prevents DynamoDB TTL expiration
     """
-    # Initialize New Relic agent here where env vars are available
+    # Initialize New Relic agent and create application
     if NEW_RELIC_ENABLED:
         newrelic.agent.initialize()
+        application = newrelic.agent.application()
 
+        # Wrap execution in background transaction for custom events
+        with newrelic.agent.BackgroundTask(application, name='scheduled_data_fetch'):
+            return _execute_handler(event, context)
+    else:
+        return _execute_handler(event, context)
+
+def _execute_handler(event, context):
+    """Execute the actual handler logic"""
     try:
         print(f"Scheduled data fetch triggered with event: {event}")
 
