@@ -179,7 +179,6 @@ def parse_ics_schedule(s3_bucket: str) -> List[Dict[str, Any]]:
                             'start_time': start_time.isoformat(),
                             'window_start': match_window_start.isoformat(),
                             'window_end': match_window_end.isoformat(),
-                            'rule_name': create_rule_name(match_summary, start_time),
                             'match_date': start_time.strftime('%Y-%m-%d')
                         }
 

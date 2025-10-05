@@ -45,16 +45,21 @@ EPL Forecast is an iOS app with AWS backend that provides English Premier League
 - **Dev API**: https://h24g9rmkz2.execute-api.us-west-2.amazonaws.com/dev
 - **Prod API**: https://aiighxj72l.execute-api.us-west-2.amazonaws.com/prod
 
-### New Architecture (Current)
-- **scheduled_data_fetcher.py**: 
+### Current Architecture (Dynamic Scheduling)
+- **scheduled_data_fetcher.py**:
   - Runs at 00:00 and 12:00 UTC via cron
   - Prevents data staleness from DynamoDB TTL expiration
-  - Always calls RapidAPI (no time checks)
+  - Always calls football-data.org API (no time checks)
+- **schedule_manager.py**:
+  - Runs every 15 minutes
+  - Parses ICS feed to detect match windows (15min before to 2.5hrs after kickoff)
+  - Dynamically enables/disables `epl-live-match-monitor-{env}` EventBridge rule
+  - Caches ICS feed in S3 for 29 hours
 - **live_match_fetcher.py**:
-  - Runs every 2 minutes in production only
-  - Only calls RapidAPI if live matches detected (15min before to 30min after match)
-  - Uses ICS feed parsing for match detection
-- **Expected Usage**: 1 call/day baseline + ~83 calls per match during live games
+  - Only runs when Schedule Manager enables the 2-minute polling rule
+  - Triggered every 2 minutes during active match windows
+  - Always calls football-data.org API when invoked (no internal time checks)
+- **Expected Usage**: 2 calls/day baseline + ~75 calls per match (2.5hr match window × 30 calls/hr)
 
 ## New Relic Integration
 
