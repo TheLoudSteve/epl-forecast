@@ -250,7 +250,7 @@ Resources:
       Handler: scheduled_data_fetcher.lambda_handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 300
-      MemorySize: 512
+      MemorySize: 256
       Code:
         ZipFile: |
           import json
@@ -314,7 +314,7 @@ Resources:
       Handler: schedule_manager.lambda_handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 300
-      MemorySize: 512
+      MemorySize: 256
       Code:
         ZipFile: |
           import json
@@ -339,7 +339,7 @@ Resources:
       Handler: api_handler.lambda_handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 30
-      MemorySize: 256
+      MemorySize: 128
       Code:
         ZipFile: |
           import json
