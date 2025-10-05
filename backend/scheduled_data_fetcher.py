@@ -18,8 +18,6 @@ from notification_logic import notification_manager
 try:
     import newrelic.agent
     NEW_RELIC_ENABLED = True
-    # Initialize New Relic agent
-    newrelic.agent.initialize()
 except ImportError:
     NEW_RELIC_ENABLED = False
 
@@ -32,9 +30,13 @@ def lambda_handler(event, context):
     Lambda function to fetch EPL data on schedule (1x daily at 00:00 UTC)
     This ensures fresh data is always available and prevents DynamoDB TTL expiration
     """
+    # Initialize New Relic agent here where env vars are available
+    if NEW_RELIC_ENABLED:
+        newrelic.agent.initialize()
+
     try:
         print(f"Scheduled data fetch triggered with event: {event}")
-        
+
         # Add New Relic custom attributes
         if NEW_RELIC_ENABLED:
             newrelic.agent.add_custom_attribute('lambda.event_type', 'scheduled_fetch')

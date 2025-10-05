@@ -34,8 +34,6 @@ def _get_notification_manager():
 try:
     import newrelic.agent
     NEW_RELIC_ENABLED = True
-    # Initialize New Relic agent
-    newrelic.agent.initialize()
 except ImportError:
     NEW_RELIC_ENABLED = False
 
@@ -48,6 +46,10 @@ def lambda_handler(event, context):
     Lambda function triggered by Schedule Manager when matches are scheduled.
     Directly fetches EPL data and updates forecasts - no ICS parsing needed.
     """
+    # Initialize New Relic agent here where env vars are available
+    if NEW_RELIC_ENABLED:
+        newrelic.agent.initialize()
+
     try:
         print(f"Match update triggered with event: {event}")
 
