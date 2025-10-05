@@ -30,10 +30,12 @@ def _get_notification_manager():
         from notification_logic import notification_manager
     return notification_manager
 
-# New Relic monitoring - handled by Lambda Layer wrapper
+# New Relic monitoring
 try:
     import newrelic.agent
     NEW_RELIC_ENABLED = True
+    # Initialize New Relic agent
+    newrelic.agent.initialize()
 except ImportError:
     NEW_RELIC_ENABLED = False
 
@@ -41,6 +43,7 @@ except ImportError:
 region = os.environ.get('AWS_REGION', 'us-east-1')
 dynamodb = boto3.resource('dynamodb', region_name=region)
 
+@newrelic.agent.lambda_handler() if NEW_RELIC_ENABLED else lambda f: f
 def lambda_handler(event, context):
     """
     Lambda function triggered by Schedule Manager when matches are scheduled.
