@@ -432,6 +432,7 @@ jobs:
         # Package scheduled data fetcher
         zip -r scheduled_data_fetcher.zip \
           scheduled_data_fetcher.py \
+          forecast_calculator.py \
           models.py \
           forecast_history.py \
           notification_logic.py \
