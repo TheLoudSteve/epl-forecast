@@ -170,6 +170,12 @@ def parse_ics_schedule(s3_bucket: str) -> List[Dict[str, Any]]:
                     if window_start <= start_time <= window_end:
                         match_summary = component.get('summary', 'Unknown Match')
 
+                        # Filter out non-match events (awards, announcements, etc.)
+                        # Real matches start with ⚽️ emoji
+                        if not str(match_summary).startswith('⚽️'):
+                            print(f"Skipping non-match event: {match_summary}")
+                            continue
+
                         # Calculate match window: 15min before to 2.5 hours after kickoff
                         match_window_start = start_time - timedelta(minutes=15)
                         match_window_end = start_time + timedelta(hours=2, minutes=30)
