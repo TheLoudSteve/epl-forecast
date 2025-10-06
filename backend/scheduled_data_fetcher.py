@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 from forecast_history import forecast_history_manager
 from notification_logic import notification_manager
+from forecast_calculator import calculate_forecasts
 
 # Use the region from environment or default to us-east-1 for backward compatibility
 region = os.environ.get('AWS_REGION', 'us-east-1')
@@ -41,7 +42,7 @@ def lambda_handler(event, context):
         print(f"Fetched EPL data with {len(epl_data.get('table', []))} teams")
         
         # Calculate forecasts
-        forecast_data = calculate_forecasts(epl_data)
+        forecast_data = calculate_forecasts(epl_data, update_type='scheduled')
         print(f"Calculated forecast data for {len(forecast_data.get('teams', []))} teams")
         
         # Store in DynamoDB
@@ -169,93 +170,6 @@ def fetch_epl_data(api_key: str) -> Dict[str, Any]:
     print(f"API Response sample: {str(data)[:500]}...")
 
     return data
-
-def calculate_forecasts(epl_data: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Calculate forecasted final table based on points per game
-
-    football-data.org API structure:
-    {
-        "standings": [
-            {
-                "type": "TOTAL",
-                "table": [
-                    {
-                        "position": 1,
-                        "team": {"name": "Arsenal", ...},
-                        "playedGames": 10,
-                        "won": 7,
-                        "draw": 2,
-                        "lost": 1,
-                        "points": 23,
-                        "goalsFor": 20,
-                        "goalsAgainst": 10,
-                        "goalDifference": 10
-                    }
-                ]
-            }
-        ]
-    }
-    """
-    teams = []
-
-    # Extract TOTAL standings table from football-data.org response
-    table_data = []
-    if 'standings' in epl_data:
-        for standing in epl_data['standings']:
-            if standing.get('type') == 'TOTAL':
-                table_data = standing.get('table', [])
-                break
-
-    print(f"Table data found: {len(table_data)} teams")
-
-    if not table_data:
-        print("WARNING: No TOTAL standings table found in API response!")
-        print(f"Available keys in epl_data: {list(epl_data.keys())}")
-        if 'standings' in epl_data:
-            print(f"Standings types available: {[s.get('type') for s in epl_data['standings']]}")
-
-    for team_data in table_data:
-        played = team_data.get('playedGames', 0)
-        points = team_data.get('points', 0)
-
-        if played > 0:
-            points_per_game = points / played
-            forecasted_points = points_per_game * 38  # Full season is 38 games
-        else:
-            points_per_game = 0
-            forecasted_points = 0
-
-        team = {
-            'name': team_data.get('team', {}).get('name', ''),
-            'played': played,
-            'won': team_data.get('won', 0),
-            'drawn': team_data.get('draw', 0),  # Note: API uses 'draw' not 'drawn'
-            'lost': team_data.get('lost', 0),
-            'for': team_data.get('goalsFor', 0),
-            'against': team_data.get('goalsAgainst', 0),
-            'goal_difference': team_data.get('goalDifference', 0),
-            'points': points,
-            'points_per_game': Decimal(str(round(points_per_game, 2))),
-            'forecasted_points': Decimal(str(round(forecasted_points, 1))),
-            'current_position': team_data.get('position', 0)
-        }
-        teams.append(team)
-
-    # Sort by forecasted points (descending), then by goal difference, then by goals for
-    teams.sort(key=lambda x: (-x['forecasted_points'], -x['goal_difference'], -x['for']))
-
-    # Add forecasted position
-    for i, team in enumerate(teams):
-        team['forecasted_position'] = i + 1
-
-    return {
-        'teams': teams,
-        'last_updated': datetime.now(timezone.utc).isoformat(),
-        'total_teams': len(teams),
-        'update_type': 'scheduled'
-    }
-
 def store_data(table, data: Dict[str, Any]) -> None:
     """
     Store forecast data in DynamoDB
