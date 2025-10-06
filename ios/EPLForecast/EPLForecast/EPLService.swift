@@ -41,25 +41,26 @@ class EPLService: ObservableObject {
         }
     }
     
-    private func fetchTeamsInBackground() {
+    private func fetchTeamsInBackground(retryCount: Int = 0) {
         // Only show loading state if we have no cached data at all
         if teams.isEmpty {
             isLoading = true
         }
         errorMessage = nil
-        
+
         // Track EPL data fetch start
         NewRelic.recordCustomEvent("EPLDataFetchStart", attributes: [
             "baseURL": baseURL,
             "startTime": Date().timeIntervalSince1970,
-            "hasCachedData": !teams.isEmpty
+            "hasCachedData": !teams.isEmpty,
+            "retryCount": retryCount
         ])
-        
+
         guard let url = URL(string: "\(baseURL)/table") else {
             let error = "Invalid URL"
             errorMessage = error
             isLoading = false
-            
+
             // Record URL validation error
             NewRelic.recordCustomEvent("EPLDataFetchError", attributes: [
                 "error": "invalid_url",
@@ -67,7 +68,7 @@ class EPLService: ObservableObject {
             ])
             return
         }
-        
+
         let startTime = Date()
         URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             let responseTime = Date().timeIntervalSince(startTime) * 1000 // Convert to milliseconds
@@ -76,6 +77,29 @@ class EPLService: ObservableObject {
                 self?.isLoading = false
                 
                 if let error = error {
+                    // Determine if this error is retryable
+                    let isRetryable = self?.isRetryableError(error) ?? false
+
+                    // Attempt retry with exponential backoff if appropriate
+                    if isRetryable && retryCount < 3 {
+                        let delay = self?.calculateBackoffDelay(retryCount: retryCount) ?? 0
+
+                        // Track retry attempt
+                        NewRelic.recordCustomEvent("EPLDataFetchRetry", attributes: [
+                            "retryCount": retryCount + 1,
+                            "delaySeconds": delay,
+                            "errorDescription": error.localizedDescription,
+                            "responseTime": responseTime
+                        ])
+
+                        // Schedule retry with exponential backoff
+                        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                            self?.fetchTeamsInBackground(retryCount: retryCount + 1)
+                        }
+                        return
+                    }
+
+                    // Max retries reached or non-retryable error - show error
                     // Only show error if we have no cached data to display
                     if self?.teams.isEmpty == true {
                         let errorType: String
@@ -86,14 +110,16 @@ class EPLService: ObservableObject {
                             errorType = "connection_error"
                             self?.errorMessage = "Connection failed. Please try again later."
                         }
-                        
+
                         // Record network error with details
                         NewRelic.recordCustomEvent("EPLDataFetchError", attributes: [
                             "error": errorType,
                             "errorDescription": error.localizedDescription,
                             "responseTime": responseTime,
                             "url": self?.baseURL ?? "unknown",
-                            "hasCachedData": self?.teams.isEmpty == false
+                            "hasCachedData": self?.teams.isEmpty == false,
+                            "finalRetryCount": retryCount,
+                            "wasRetryable": isRetryable
                         ])
                     }
                     return
@@ -113,10 +139,32 @@ class EPLService: ObservableObject {
                 }
                 
                 guard 200...299 ~= httpResponse.statusCode else {
+                    let statusCode = httpResponse.statusCode
+
+                    // Retry 5xx server errors (transient)
+                    if (500...599).contains(statusCode) && retryCount < 3 {
+                        let delay = self?.calculateBackoffDelay(retryCount: retryCount) ?? 0
+
+                        // Track retry attempt for server error
+                        NewRelic.recordCustomEvent("EPLDataFetchRetry", attributes: [
+                            "retryCount": retryCount + 1,
+                            "delaySeconds": delay,
+                            "statusCode": statusCode,
+                            "errorType": "server_error",
+                            "responseTime": responseTime
+                        ])
+
+                        // Schedule retry with exponential backoff
+                        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                            self?.fetchTeamsInBackground(retryCount: retryCount + 1)
+                        }
+                        return
+                    }
+
+                    // Max retries reached or non-retryable error (4xx)
                     if self?.teams.isEmpty == true {
-                        let statusCode = httpResponse.statusCode
                         let errorMessage: String
-                        
+
                         switch statusCode {
                         case 500...599:
                             errorMessage = "Server is temporarily unavailable. Please try again in a few minutes."
@@ -125,15 +173,16 @@ class EPLService: ObservableObject {
                         default:
                             errorMessage = "Something went wrong. Please try again later."
                         }
-                        
+
                         self?.errorMessage = errorMessage
-                        
+
                         // Record HTTP error with status code
                         NewRelic.recordCustomEvent("EPLDataFetchError", attributes: [
                             "error": "http_error",
                             "statusCode": statusCode,
                             "errorMessage": errorMessage,
-                            "responseTime": responseTime
+                            "responseTime": responseTime,
+                            "finalRetryCount": retryCount
                         ])
                     }
                     return
@@ -302,15 +351,40 @@ class EPLService: ObservableObject {
         guard let date = formatter.date(from: isoString) else {
             return isoString
         }
-        
+
         let displayFormatter = DateFormatter()
         displayFormatter.dateStyle = .medium
         displayFormatter.timeStyle = .short
         displayFormatter.timeZone = TimeZone.current
-        
+
         return displayFormatter.string(from: date)
     }
-    
+
+    // MARK: - Retry Logic (EPLF-68)
+
+    /// Determines if an error is transient and should be retried
+    private func isRetryableError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+
+        // Network errors that are typically transient
+        let retryableNetworkErrors: Set<Int> = [
+            NSURLErrorTimedOut,              // -1001: Request timeout
+            NSURLErrorCannotFindHost,        // -1003: DNS lookup failed
+            NSURLErrorCannotConnectToHost,   // -1004: Connection refused
+            NSURLErrorNetworkConnectionLost, // -1005: Connection lost
+            NSURLErrorNotConnectedToInternet,// -1009: No internet
+            NSURLErrorBadServerResponse,     // -1011: Malformed response
+            NSURLErrorDNSLookupFailed        // -1006: DNS failed
+        ]
+
+        return retryableNetworkErrors.contains(nsError.code)
+    }
+
+    /// Calculates exponential backoff delay: 1s, 2s, 4s
+    private func calculateBackoffDelay(retryCount: Int) -> TimeInterval {
+        return pow(2.0, Double(retryCount))  // 2^0=1s, 2^1=2s, 2^2=4s
+    }
+
     // MARK: - Notification Methods
 
     func checkNotificationSetup(completion: @escaping (Bool, String) -> Void) {
