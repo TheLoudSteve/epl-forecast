@@ -121,6 +121,18 @@ Resources:
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
 
+  # SQS Dead Letter Queue for Lambda errors
+  LambdaErrorQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'epl-lambda-errors-${Environment}'
+      MessageRetentionPeriod: 1209600  # 14 days
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: Lambda Dead Letter Queue
+
   # SNS Topic for push notifications
   PushNotificationTopic:
     Type: AWS::SNS::Topic
@@ -189,6 +201,14 @@ Resources:
                 Action:
                   - cloudwatch:PutMetricData
                 Resource: '*'
+        - PolicyName: SQSDeadLetterQueuePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                Resource: !GetAtt LambdaErrorQueue.Arn
 
   # IAM role for New Relic AWS integration (API polling)
   NewRelicInfrastructureRole:
@@ -250,6 +270,8 @@ Resources:
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 300
       MemorySize: 256
+      DeadLetterConfig:
+        TargetArn: !GetAtt LambdaErrorQueue.Arn
       Code:
         ZipFile: |
           import json
@@ -282,6 +304,8 @@ Resources:
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 300
       MemorySize: 256
+      DeadLetterConfig:
+        TargetArn: !GetAtt LambdaErrorQueue.Arn
       Code:
         ZipFile: |
           import json
@@ -314,6 +338,8 @@ Resources:
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 300
       MemorySize: 256
+      DeadLetterConfig:
+        TargetArn: !GetAtt LambdaErrorQueue.Arn
       Code:
         ZipFile: |
           import json
@@ -339,6 +365,8 @@ Resources:
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 30
       MemorySize: 128
+      DeadLetterConfig:
+        TargetArn: !GetAtt LambdaErrorQueue.Arn
       Code:
         ZipFile: |
           import json
@@ -752,7 +780,19 @@ Outputs:
 
   NewRelicRoleArn:
     Condition: EnableNewRelic
-    Description: New Relic Infrastructure Role ARN for API polling integration  
+    Description: New Relic Infrastructure Role ARN for API polling integration
     Value: !GetAtt NewRelicInfrastructureRole.Arn
     Export:
       Name: !Sub '${AWS::StackName}-NewRelicRoleArn'
+
+  LambdaErrorQueue:
+    Description: SQS Dead Letter Queue for Lambda errors
+    Value: !Ref LambdaErrorQueue
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaErrorQueue'
+
+  LambdaErrorQueueArn:
+    Description: SQS Dead Letter Queue ARN for Lambda errors
+    Value: !GetAtt LambdaErrorQueue.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaErrorQueueArn'
