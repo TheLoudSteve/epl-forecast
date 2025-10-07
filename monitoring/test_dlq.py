@@ -8,16 +8,17 @@ import boto3
 import json
 import time
 
-def test_lambda_dlq(function_name, environment='dev'):
+def test_lambda_dlq(function_name, environment='dev', region='us-west-2'):
     """
     Test DLQ by invoking Lambda with a payload that causes an error
 
     Args:
         function_name: Name of Lambda function to test (without env suffix)
         environment: Environment (dev/prod)
+        region: AWS region (default: us-west-2)
     """
-    lambda_client = boto3.client('lambda')
-    sqs_client = boto3.client('sqs')
+    lambda_client = boto3.client('lambda', region_name=region)
+    sqs_client = boto3.client('sqs', region_name=region)
 
     full_function_name = f'{function_name}-{environment}'
     queue_name = f'epl-lambda-errors-{environment}'
@@ -31,6 +32,12 @@ def test_lambda_dlq(function_name, environment='dev'):
         print(f"✅ Found DLQ: {queue_name}")
     except sqs_client.exceptions.QueueDoesNotExist:
         print(f"❌ ERROR: DLQ '{queue_name}' does not exist. Deploy CloudFormation stack first.")
+        print(f"   Region: {region}")
+        return False
+    except Exception as e:
+        print(f"❌ ERROR: Unexpected error getting queue URL: {e}")
+        print(f"   Queue name: {queue_name}")
+        print(f"   Region: {region}")
         return False
 
     # Check initial queue depth
