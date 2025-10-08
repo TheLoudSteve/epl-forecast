@@ -106,6 +106,15 @@ def lambda_handler(event, context):
             newrelic.agent.record_custom_metric('Custom/ScheduleManager/WindowActive', 1 if window_status['is_active'] else 0)
             newrelic.agent.record_custom_metric('Custom/ScheduleManager/RuleEnabled', 1 if rule_result['state'] == 'ENABLED' else 0)
 
+            # Record match window evaluation event
+            newrelic.agent.record_custom_event('MatchWindowEvaluation', {
+                'window_active': window_status['is_active'],
+                'active_matches': len(window_status.get('active_matches', [])),
+                'upcoming_matches': len(window_status.get('upcoming_matches', [])),
+                'rule_state': rule_result['state'],
+                'reason': window_status['reason']
+            })
+
         return {
             'statusCode': 200,
             'body': json.dumps({

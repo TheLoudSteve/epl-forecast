@@ -1,0 +1,400 @@
+{
+  "name": "Football API Monitoring",
+  "description": "Monitoring for football-data.org API calls from EPL Forecast backend",
+  "permissions": "PUBLIC_READ_WRITE",
+  "pages": [
+    {
+      "name": "Football API Overview",
+      "description": "Overview of API calls, response times, and status codes",
+      "widgets": [
+        {
+          "title": "Total API Calls (24h)",
+          "layout": {
+            "column": 1,
+            "row": 1,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT sum(aws.eplforecast.footballapi.APICallCount) AS 'Total Calls' WHERE collector.name = 'cloudwatch-metric-streams' SINCE 1 day ago"
+              }
+            ],
+            "thresholds": []
+          }
+        },
+        {
+          "title": "Average Response Time (1h)",
+          "layout": {
+            "column": 5,
+            "row": 1,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT average(aws.eplforecast.footballapi.APIResponseTime) AS 'Avg Response Time (ms)' WHERE collector.name = 'cloudwatch-metric-streams' SINCE 1 hour ago"
+              }
+            ],
+            "thresholds": [
+              {
+                "alertSeverity": "WARNING",
+                "value": 1000
+              },
+              {
+                "alertSeverity": "CRITICAL",
+                "value": 2000
+              }
+            ]
+          }
+        },
+        {
+          "title": "API Calls by Environment",
+          "layout": {
+            "column": 9,
+            "row": 1,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.pie"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT sum(aws.eplforecast.footballapi.APICallCount) WHERE collector.name = 'cloudwatch-metric-streams' FACET aws.eplforecast.footballapi.Environment SINCE 1 day ago"
+              }
+            ]
+          }
+        },
+        {
+          "title": "API Calls Over Time",
+          "layout": {
+            "column": 1,
+            "row": 4,
+            "width": 8,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT sum(aws.eplforecast.footballapi.APICallCount) WHERE collector.name = 'cloudwatch-metric-streams' FACET aws.eplforecast.footballapi.Environment TIMESERIES AUTO SINCE 1 day ago"
+              }
+            ]
+          }
+        },
+        {
+          "title": "API Calls by Status Code",
+          "layout": {
+            "column": 9,
+            "row": 4,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.bar"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT sum(aws.eplforecast.footballapi.APICallCount) WHERE collector.name = 'cloudwatch-metric-streams' FACET aws.eplforecast.footballapi.StatusCode, aws.eplforecast.footballapi.Environment SINCE 1 day ago"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Response Time by Environment",
+          "layout": {
+            "column": 1,
+            "row": 7,
+            "width": 12,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT average(aws.eplforecast.footballapi.APIResponseTime) WHERE collector.name = 'cloudwatch-metric-streams' FACET aws.eplforecast.footballapi.Environment TIMESERIES AUTO SINCE 1 day ago"
+              }
+            ]
+          }
+        },
+        {
+          "title": "API Call Details by Environment & Reason",
+          "layout": {
+            "column": 1,
+            "row": 10,
+            "width": 12,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.table"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT sum(aws.eplforecast.footballapi.APICallCount) AS 'Total Calls', average(aws.eplforecast.footballapi.APIResponseTime) AS 'Avg Response Time (ms)', latest(timestamp) AS 'Last Call' WHERE collector.name = 'cloudwatch-metric-streams' FACET aws.eplforecast.footballapi.Environment, aws.eplforecast.footballapi.CallReason, aws.eplforecast.footballapi.StatusCode SINCE 1 day ago"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Dev Environment - API Calls Over Time",
+          "layout": {
+            "column": 1,
+            "row": 13,
+            "width": 6,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT sum(aws.eplforecast.footballapi.APICallCount) WHERE collector.name = 'cloudwatch-metric-streams' AND aws.eplforecast.footballapi.Environment = 'dev' FACET aws.eplforecast.footballapi.CallReason TIMESERIES AUTO SINCE 1 day ago"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Prod Environment - API Calls Over Time",
+          "layout": {
+            "column": 7,
+            "row": 13,
+            "width": 6,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT sum(aws.eplforecast.footballapi.APICallCount) WHERE collector.name = 'cloudwatch-metric-streams' AND aws.eplforecast.footballapi.Environment = 'prod' FACET aws.eplforecast.footballapi.CallReason TIMESERIES AUTO SINCE 1 day ago"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Dev Environment - Response Time",
+          "layout": {
+            "column": 1,
+            "row": 16,
+            "width": 6,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT min(aws.eplforecast.footballapi.APIResponseTime) AS 'Min', average(aws.eplforecast.footballapi.APIResponseTime) AS 'Avg', max(aws.eplforecast.footballapi.APIResponseTime) AS 'Max' WHERE collector.name = 'cloudwatch-metric-streams' AND aws.eplforecast.footballapi.Environment = 'dev' TIMESERIES AUTO SINCE 1 day ago"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Prod Environment - Response Time",
+          "layout": {
+            "column": 7,
+            "row": 16,
+            "width": 6,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT min(aws.eplforecast.footballapi.APIResponseTime) AS 'Min', average(aws.eplforecast.footballapi.APIResponseTime) AS 'Avg', max(aws.eplforecast.footballapi.APIResponseTime) AS 'Max' WHERE collector.name = 'cloudwatch-metric-streams' AND aws.eplforecast.footballapi.Environment = 'prod' TIMESERIES AUTO SINCE 1 day ago"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Business Metrics",
+      "description": "Business logic and user-facing metrics",
+      "widgets": [
+        {
+          "title": "Position Changes (24h)",
+          "layout": {
+            "column": 1,
+            "row": 1,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM PositionChangesDetected SELECT sum(total_changes) AS 'Total Changes', sum(teams_affected) AS 'Teams Affected' SINCE 1 day ago"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Notifications Sent (24h)",
+          "layout": {
+            "column": 5,
+            "row": 1,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM NotificationBatchProcessed SELECT sum(users_notified) AS 'Users Notified' SINCE 1 day ago"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Notification Success Rate",
+          "layout": {
+            "column": 9,
+            "row": 1,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT (sum(custom.notifications.sent) / (sum(custom.notifications.sent) + sum(custom.notifications.failed))) * 100 AS 'Success Rate %' SINCE 1 day ago"
+              }
+            ],
+            "thresholds": [
+              {
+                "alertSeverity": "CRITICAL",
+                "value": 95
+              },
+              {
+                "alertSeverity": "WARNING",
+                "value": 98
+              }
+            ]
+          }
+        },
+        {
+          "title": "Match Window Activity",
+          "layout": {
+            "column": 1,
+            "row": 4,
+            "width": 8,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM MatchWindowEvaluation SELECT latest(window_active) AS 'Window Active', latest(active_matches) AS 'Active Matches', latest(upcoming_matches) AS 'Upcoming Matches' TIMESERIES AUTO SINCE 1 day ago"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Match Updates Success/Failure",
+          "layout": {
+            "column": 9,
+            "row": 4,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.pie"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT sum(custom.matchupdate.success) AS 'Success', sum(custom.matchupdate.failed) AS 'Failed' SINCE 1 day ago"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Position Changes Over Time",
+          "layout": {
+            "column": 1,
+            "row": 7,
+            "width": 6,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.area"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM PositionChangesDetected SELECT sum(total_changes) AS 'Position Changes', sum(teams_affected) AS 'Teams' TIMESERIES AUTO SINCE 1 day ago"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Notification Batch Results",
+          "layout": {
+            "column": 7,
+            "row": 7,
+            "width": 6,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.table"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM NotificationBatchProcessed SELECT timestamp, position_changes, users_notified, context SINCE 1 day ago LIMIT 20"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

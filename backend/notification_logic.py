@@ -15,6 +15,18 @@ from push_notification_service import push_notification_service
 from notification_content_generator import notification_content_generator
 from notification_rate_limiter import notification_rate_limiter
 
+# New Relic integration
+try:
+    import newrelic.agent
+
+    if os.environ.get('NEW_RELIC_LICENSE_KEY'):
+        newrelic.agent.initialize()
+        NEW_RELIC_ENABLED = True
+    else:
+        NEW_RELIC_ENABLED = False
+except ImportError:
+    NEW_RELIC_ENABLED = False
+
 # Initialize DynamoDB
 region = os.environ.get('AWS_REGION', 'us-east-1')
 dynamodb = boto3.resource('dynamodb', region_name=region)
@@ -59,8 +71,17 @@ class NotificationManager:
         if not position_changes:
             print("No position changes detected")
             return {'message': 'No position changes detected', 'notifications_sent': 0}
-        
+
         print(f"Detected {len(position_changes)} position changes")
+
+        # Record position changes detected event
+        if NEW_RELIC_ENABLED:
+            teams_affected = len(set(change.team_name for change in position_changes))
+            newrelic.agent.record_custom_event('PositionChangesDetected', {
+                'total_changes': len(position_changes),
+                'teams_affected': teams_affected,
+                'context': context
+            })
         
         # Get all user preferences
         user_preferences = self._get_all_user_preferences()
@@ -108,7 +129,16 @@ class NotificationManager:
                     else:  # END_OF_DAY
                         if self._queue_end_of_day_notification(preferences, notification_content):
                             notifications_sent += 1
-        
+
+        # Record final notification metrics
+        if NEW_RELIC_ENABLED:
+            newrelic.agent.record_custom_event('NotificationBatchProcessed', {
+                'position_changes': len(position_changes),
+                'users_notified': notifications_sent,
+                'notifications_processed': notifications_processed,
+                'context': context
+            })
+
         return {
             'message': f'Processed {notifications_processed} potential notifications, sent {notifications_sent}',
             'position_changes_detected': len(position_changes),
@@ -252,13 +282,22 @@ class NotificationManager:
         if result['success']:
             message_id = result.get('message_id', 'N/A')
             print(f"  ✅ Push notification sent successfully (MessageID: {message_id})")
-            
+
             # Record the successful notification for rate limiting
             notification_rate_limiter.record_sent_notification(preferences, content, str(message_id))
-            
+
+            # Record success metric
+            if NEW_RELIC_ENABLED:
+                newrelic.agent.record_custom_metric('Custom/Notifications/Sent', 1)
+
             return True
         else:
             print(f"  ❌ Push notification failed: {result.get('error', 'Unknown error')}")
+
+            # Record failure metric
+            if NEW_RELIC_ENABLED:
+                newrelic.agent.record_custom_metric('Custom/Notifications/Failed', 1)
+
             return False
     
     def _queue_end_of_day_notification(self, preferences: UserNotificationPreferences, 

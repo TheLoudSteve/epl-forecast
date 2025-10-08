@@ -9,6 +9,18 @@ from tenacity import retry, stop_after_attempt, wait_exponential, RetryError, af
 import logging
 from forecast_calculator import calculate_forecasts
 
+# New Relic integration
+try:
+    import newrelic.agent
+
+    if os.environ.get('NEW_RELIC_LICENSE_KEY'):
+        newrelic.agent.initialize()
+        NEW_RELIC_ENABLED = True
+    else:
+        NEW_RELIC_ENABLED = False
+except ImportError:
+    NEW_RELIC_ENABLED = False
+
 # Set up logging for retry tracking
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -71,6 +83,12 @@ def lambda_handler(event, context):
         store_data(table, forecast_data)
         print("Successfully stored match data in DynamoDB")
 
+        # Record match update metrics
+        if NEW_RELIC_ENABLED:
+            newrelic.agent.record_custom_metric('Custom/MatchUpdate/TeamsProcessed',
+                                               len(forecast_data.get('teams', [])))
+            newrelic.agent.record_custom_metric('Custom/MatchUpdate/Success', 1)
+
         # Save forecast snapshot to history
         try:
             context = f"Match update - {match_context}"
@@ -106,6 +124,11 @@ def lambda_handler(event, context):
 
     except Exception as e:
         print(f"Error: {str(e)}")
+
+        # Record failure metric
+        if NEW_RELIC_ENABLED:
+            newrelic.agent.record_custom_metric('Custom/MatchUpdate/Failed', 1)
+
         return {
             'statusCode': 500,
             'body': json.dumps({
