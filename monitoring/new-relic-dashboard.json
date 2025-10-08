@@ -2,6 +2,49 @@
   "name": "Football API Monitoring",
   "description": "Monitoring for football-data.org API calls from EPL Forecast backend",
   "permissions": "PUBLIC_READ_WRITE",
+  "variables": [
+    {
+      "name": "timeWindow",
+      "title": "Time Window",
+      "type": "enum",
+      "defaultValues": [
+        {
+          "value": {
+            "string": "1 day ago"
+          }
+        }
+      ],
+      "items": [
+        {
+          "title": "Last 6 Hours",
+          "value": "6 hours ago"
+        },
+        {
+          "title": "Last 12 Hours",
+          "value": "12 hours ago"
+        },
+        {
+          "title": "Last 24 Hours",
+          "value": "1 day ago"
+        },
+        {
+          "title": "Last 48 Hours",
+          "value": "2 days ago"
+        },
+        {
+          "title": "Last 7 Days",
+          "value": "7 days ago"
+        },
+        {
+          "title": "Last 30 Days",
+          "value": "30 days ago"
+        }
+      ],
+      "isMultiSelection": false,
+      "nrqlQuery": null,
+      "replacementStrategy": "string"
+    }
+  ],
   "pages": [
     {
       "name": "Football API Overview",
@@ -22,7 +65,7 @@
             "nrqlQueries": [
               {
                 "accountId": 7052187,
-                "query": "FROM Metric SELECT sum(aws.eplforecast.footballapi.APICallCount) AS 'Total Calls' WHERE collector.name = 'cloudwatch-metric-streams' SINCE 1 day ago"
+                "query": "FROM Metric SELECT sum(aws.eplforecast.footballapi.APICallCount) AS 'Total Calls' WHERE collector.name = 'cloudwatch-metric-streams' SINCE {{timeWindow}}"
               }
             ],
             "thresholds": []
@@ -43,7 +86,7 @@
             "nrqlQueries": [
               {
                 "accountId": 7052187,
-                "query": "FROM Metric SELECT average(aws.eplforecast.footballapi.APIResponseTime) AS 'Avg Response Time (ms)' WHERE collector.name = 'cloudwatch-metric-streams' SINCE 1 hour ago"
+                "query": "FROM Metric SELECT average(aws.eplforecast.footballapi.APIResponseTime) AS 'Avg Response Time (ms)' WHERE collector.name = 'cloudwatch-metric-streams' SINCE {{timeWindow}}"
               }
             ],
             "thresholds": [
@@ -73,7 +116,7 @@
             "nrqlQueries": [
               {
                 "accountId": 7052187,
-                "query": "FROM Metric SELECT sum(aws.eplforecast.footballapi.APICallCount) WHERE collector.name = 'cloudwatch-metric-streams' FACET aws.eplforecast.footballapi.Environment SINCE 1 day ago"
+                "query": "FROM Metric SELECT sum(aws.eplforecast.footballapi.APICallCount) WHERE collector.name = 'cloudwatch-metric-streams' FACET aws.eplforecast.footballapi.Environment SINCE {{timeWindow}}"
               }
             ]
           }
@@ -93,7 +136,7 @@
             "nrqlQueries": [
               {
                 "accountId": 7052187,
-                "query": "FROM Metric SELECT sum(aws.eplforecast.footballapi.APICallCount) WHERE collector.name = 'cloudwatch-metric-streams' FACET aws.eplforecast.footballapi.Environment TIMESERIES AUTO SINCE 1 day ago"
+                "query": "FROM Metric SELECT sum(aws.eplforecast.footballapi.APICallCount) WHERE collector.name = 'cloudwatch-metric-streams' FACET aws.eplforecast.footballapi.Environment TIMESERIES AUTO SINCE {{timeWindow}}"
               }
             ]
           }
@@ -113,7 +156,7 @@
             "nrqlQueries": [
               {
                 "accountId": 7052187,
-                "query": "FROM Metric SELECT sum(aws.eplforecast.footballapi.APICallCount) WHERE collector.name = 'cloudwatch-metric-streams' FACET aws.eplforecast.footballapi.StatusCode, aws.eplforecast.footballapi.Environment SINCE 1 day ago"
+                "query": "FROM Metric SELECT sum(aws.eplforecast.footballapi.APICallCount) WHERE collector.name = 'cloudwatch-metric-streams' FACET aws.eplforecast.footballapi.StatusCode, aws.eplforecast.footballapi.Environment SINCE {{timeWindow}}"
               }
             ]
           }
@@ -133,7 +176,7 @@
             "nrqlQueries": [
               {
                 "accountId": 7052187,
-                "query": "FROM Metric SELECT average(aws.eplforecast.footballapi.APIResponseTime) WHERE collector.name = 'cloudwatch-metric-streams' FACET aws.eplforecast.footballapi.Environment TIMESERIES AUTO SINCE 1 day ago"
+                "query": "FROM Metric SELECT average(aws.eplforecast.footballapi.APIResponseTime) WHERE collector.name = 'cloudwatch-metric-streams' FACET aws.eplforecast.footballapi.Environment TIMESERIES AUTO SINCE {{timeWindow}}"
               }
             ]
           }
@@ -153,7 +196,7 @@
             "nrqlQueries": [
               {
                 "accountId": 7052187,
-                "query": "FROM Metric SELECT sum(aws.eplforecast.footballapi.APICallCount) AS 'Total Calls', average(aws.eplforecast.footballapi.APIResponseTime) AS 'Avg Response Time (ms)', latest(timestamp) AS 'Last Call' WHERE collector.name = 'cloudwatch-metric-streams' FACET aws.eplforecast.footballapi.Environment, aws.eplforecast.footballapi.CallReason, aws.eplforecast.footballapi.StatusCode SINCE 1 day ago"
+                "query": "FROM Metric SELECT sum(aws.eplforecast.footballapi.APICallCount) AS 'Total Calls', average(aws.eplforecast.footballapi.APIResponseTime) AS 'Avg Response Time (ms)', latest(timestamp) AS 'Last Call' WHERE collector.name = 'cloudwatch-metric-streams' FACET aws.eplforecast.footballapi.Environment, aws.eplforecast.footballapi.CallReason, aws.eplforecast.footballapi.StatusCode SINCE {{timeWindow}}"
               }
             ]
           }
@@ -173,7 +216,7 @@
             "nrqlQueries": [
               {
                 "accountId": 7052187,
-                "query": "FROM Metric SELECT sum(aws.eplforecast.footballapi.APICallCount) WHERE collector.name = 'cloudwatch-metric-streams' AND aws.eplforecast.footballapi.Environment = 'dev' FACET aws.eplforecast.footballapi.CallReason TIMESERIES AUTO SINCE 1 day ago"
+                "query": "FROM Metric SELECT sum(aws.eplforecast.footballapi.APICallCount) WHERE collector.name = 'cloudwatch-metric-streams' AND aws.eplforecast.footballapi.Environment = 'dev' FACET aws.eplforecast.footballapi.CallReason TIMESERIES AUTO SINCE {{timeWindow}}"
               }
             ]
           }
@@ -193,7 +236,7 @@
             "nrqlQueries": [
               {
                 "accountId": 7052187,
-                "query": "FROM Metric SELECT sum(aws.eplforecast.footballapi.APICallCount) WHERE collector.name = 'cloudwatch-metric-streams' AND aws.eplforecast.footballapi.Environment = 'prod' FACET aws.eplforecast.footballapi.CallReason TIMESERIES AUTO SINCE 1 day ago"
+                "query": "FROM Metric SELECT sum(aws.eplforecast.footballapi.APICallCount) WHERE collector.name = 'cloudwatch-metric-streams' AND aws.eplforecast.footballapi.Environment = 'prod' FACET aws.eplforecast.footballapi.CallReason TIMESERIES AUTO SINCE {{timeWindow}}"
               }
             ]
           }
@@ -213,7 +256,7 @@
             "nrqlQueries": [
               {
                 "accountId": 7052187,
-                "query": "FROM Metric SELECT min(aws.eplforecast.footballapi.APIResponseTime) AS 'Min', average(aws.eplforecast.footballapi.APIResponseTime) AS 'Avg', max(aws.eplforecast.footballapi.APIResponseTime) AS 'Max' WHERE collector.name = 'cloudwatch-metric-streams' AND aws.eplforecast.footballapi.Environment = 'dev' TIMESERIES AUTO SINCE 1 day ago"
+                "query": "FROM Metric SELECT min(aws.eplforecast.footballapi.APIResponseTime) AS 'Min', average(aws.eplforecast.footballapi.APIResponseTime) AS 'Avg', max(aws.eplforecast.footballapi.APIResponseTime) AS 'Max' WHERE collector.name = 'cloudwatch-metric-streams' AND aws.eplforecast.footballapi.Environment = 'dev' TIMESERIES AUTO SINCE {{timeWindow}}"
               }
             ]
           }
@@ -233,7 +276,7 @@
             "nrqlQueries": [
               {
                 "accountId": 7052187,
-                "query": "FROM Metric SELECT min(aws.eplforecast.footballapi.APIResponseTime) AS 'Min', average(aws.eplforecast.footballapi.APIResponseTime) AS 'Avg', max(aws.eplforecast.footballapi.APIResponseTime) AS 'Max' WHERE collector.name = 'cloudwatch-metric-streams' AND aws.eplforecast.footballapi.Environment = 'prod' TIMESERIES AUTO SINCE 1 day ago"
+                "query": "FROM Metric SELECT min(aws.eplforecast.footballapi.APIResponseTime) AS 'Min', average(aws.eplforecast.footballapi.APIResponseTime) AS 'Avg', max(aws.eplforecast.footballapi.APIResponseTime) AS 'Max' WHERE collector.name = 'cloudwatch-metric-streams' AND aws.eplforecast.footballapi.Environment = 'prod' TIMESERIES AUTO SINCE {{timeWindow}}"
               }
             ]
           }
@@ -259,7 +302,7 @@
             "nrqlQueries": [
               {
                 "accountId": 7052187,
-                "query": "FROM PositionChangesDetected SELECT sum(total_changes) AS 'Total Changes', sum(teams_affected) AS 'Teams Affected' SINCE 1 day ago"
+                "query": "FROM PositionChangesDetected SELECT sum(total_changes) AS 'Total Changes', sum(teams_affected) AS 'Teams Affected' SINCE {{timeWindow}}"
               }
             ]
           }
@@ -279,7 +322,7 @@
             "nrqlQueries": [
               {
                 "accountId": 7052187,
-                "query": "FROM NotificationBatchProcessed SELECT sum(users_notified) AS 'Users Notified' SINCE 1 day ago"
+                "query": "FROM NotificationBatchProcessed SELECT sum(users_notified) AS 'Users Notified' SINCE {{timeWindow}}"
               }
             ]
           }
@@ -299,7 +342,7 @@
             "nrqlQueries": [
               {
                 "accountId": 7052187,
-                "query": "FROM Metric SELECT (sum(custom.notifications.sent) / (sum(custom.notifications.sent) + sum(custom.notifications.failed))) * 100 AS 'Success Rate %' SINCE 1 day ago"
+                "query": "FROM Metric SELECT (sum(custom.notifications.sent) / (sum(custom.notifications.sent) + sum(custom.notifications.failed))) * 100 AS 'Success Rate %' SINCE {{timeWindow}}"
               }
             ],
             "thresholds": [
@@ -329,7 +372,7 @@
             "nrqlQueries": [
               {
                 "accountId": 7052187,
-                "query": "FROM MatchWindowEvaluation SELECT latest(window_active) AS 'Window Active', latest(active_matches) AS 'Active Matches', latest(upcoming_matches) AS 'Upcoming Matches' TIMESERIES AUTO SINCE 1 day ago"
+                "query": "FROM MatchWindowEvaluation SELECT latest(window_active) AS 'Window Active', latest(active_matches) AS 'Active Matches', latest(upcoming_matches) AS 'Upcoming Matches' TIMESERIES AUTO SINCE {{timeWindow}}"
               }
             ]
           }
@@ -349,7 +392,7 @@
             "nrqlQueries": [
               {
                 "accountId": 7052187,
-                "query": "FROM Metric SELECT sum(custom.matchupdate.success) AS 'Success', sum(custom.matchupdate.failed) AS 'Failed' SINCE 1 day ago"
+                "query": "FROM Metric SELECT sum(custom.matchupdate.success) AS 'Success', sum(custom.matchupdate.failed) AS 'Failed' SINCE {{timeWindow}}"
               }
             ]
           }
@@ -369,7 +412,7 @@
             "nrqlQueries": [
               {
                 "accountId": 7052187,
-                "query": "FROM PositionChangesDetected SELECT sum(total_changes) AS 'Position Changes', sum(teams_affected) AS 'Teams' TIMESERIES AUTO SINCE 1 day ago"
+                "query": "FROM PositionChangesDetected SELECT sum(total_changes) AS 'Position Changes', sum(teams_affected) AS 'Teams' TIMESERIES AUTO SINCE {{timeWindow}}"
               }
             ]
           }
@@ -389,7 +432,311 @@
             "nrqlQueries": [
               {
                 "accountId": 7052187,
-                "query": "FROM NotificationBatchProcessed SELECT timestamp, position_changes, users_notified, context SINCE 1 day ago LIMIT 20"
+                "query": "FROM NotificationBatchProcessed SELECT timestamp, position_changes, users_notified, context SINCE {{timeWindow}} LIMIT 20"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "System Performance",
+      "description": "Lambda execution metrics, errors, and system health",
+      "widgets": [
+        {
+          "title": "Lambda Invocations",
+          "layout": {
+            "column": 1,
+            "row": 1,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT sum(aws.lambda.Invocations) WHERE collector.name = 'cloudwatch-metric-streams' FACET aws.lambda.FunctionName SINCE {{timeWindow}}"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Lambda Errors",
+          "layout": {
+            "column": 5,
+            "row": 1,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT sum(aws.lambda.Errors) AS 'Total Errors' WHERE collector.name = 'cloudwatch-metric-streams' SINCE {{timeWindow}}"
+              }
+            ],
+            "thresholds": [
+              {
+                "alertSeverity": "WARNING",
+                "value": 1
+              },
+              {
+                "alertSeverity": "CRITICAL",
+                "value": 5
+              }
+            ]
+          }
+        },
+        {
+          "title": "Lambda Error Rate %",
+          "layout": {
+            "column": 9,
+            "row": 1,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT (sum(aws.lambda.Errors) / sum(aws.lambda.Invocations)) * 100 AS 'Error Rate %' WHERE collector.name = 'cloudwatch-metric-streams' SINCE {{timeWindow}}"
+              }
+            ],
+            "thresholds": [
+              {
+                "alertSeverity": "CRITICAL",
+                "value": 1
+              },
+              {
+                "alertSeverity": "WARNING",
+                "value": 5
+              }
+            ]
+          }
+        },
+        {
+          "title": "Lambda Duration by Function",
+          "layout": {
+            "column": 1,
+            "row": 4,
+            "width": 6,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT average(aws.lambda.Duration) WHERE collector.name = 'cloudwatch-metric-streams' FACET aws.lambda.FunctionName TIMESERIES AUTO SINCE {{timeWindow}}"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Lambda Concurrent Executions",
+          "layout": {
+            "column": 7,
+            "row": 4,
+            "width": 6,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT max(aws.lambda.ConcurrentExecutions) WHERE collector.name = 'cloudwatch-metric-streams' FACET aws.lambda.FunctionName TIMESERIES AUTO SINCE {{timeWindow}}"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Lambda Throttles",
+          "layout": {
+            "column": 1,
+            "row": 7,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT sum(aws.lambda.Throttles) AS 'Total Throttles' WHERE collector.name = 'cloudwatch-metric-streams' SINCE {{timeWindow}}"
+              }
+            ],
+            "thresholds": [
+              {
+                "alertSeverity": "CRITICAL",
+                "value": 1
+              }
+            ]
+          }
+        },
+        {
+          "title": "Dead Letter Queue Depth",
+          "layout": {
+            "column": 5,
+            "row": 7,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT latest(aws.sqs.ApproximateNumberOfMessagesVisible) AS 'Messages in DLQ' WHERE collector.name = 'cloudwatch-metric-streams' AND entityName LIKE '%epl-lambda-errors%' SINCE {{timeWindow}}"
+              }
+            ],
+            "thresholds": [
+              {
+                "alertSeverity": "CRITICAL",
+                "value": 1
+              }
+            ]
+          }
+        },
+        {
+          "title": "API Gateway Requests",
+          "layout": {
+            "column": 9,
+            "row": 7,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT sum(aws.apigateway.Count) AS 'Total Requests' WHERE collector.name = 'cloudwatch-metric-streams' SINCE {{timeWindow}}"
+              }
+            ]
+          }
+        },
+        {
+          "title": "API Gateway 4xx/5xx Errors",
+          "layout": {
+            "column": 1,
+            "row": 10,
+            "width": 6,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT sum(aws.apigateway.4XXError) AS '4xx Errors', sum(aws.apigateway.5XXError) AS '5xx Errors' WHERE collector.name = 'cloudwatch-metric-streams' TIMESERIES AUTO SINCE {{timeWindow}}"
+              }
+            ]
+          }
+        },
+        {
+          "title": "API Gateway Latency",
+          "layout": {
+            "column": 7,
+            "row": 10,
+            "width": 6,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT average(aws.apigateway.Latency) AS 'Avg Latency', percentile(aws.apigateway.Latency, 95) AS 'p95 Latency', percentile(aws.apigateway.Latency, 99) AS 'p99 Latency' WHERE collector.name = 'cloudwatch-metric-streams' TIMESERIES AUTO SINCE {{timeWindow}}"
+              }
+            ]
+          }
+        },
+        {
+          "title": "DynamoDB Read/Write Operations",
+          "layout": {
+            "column": 1,
+            "row": 13,
+            "width": 6,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT sum(aws.dynamodb.ConsumedReadCapacityUnits) AS 'Read Units', sum(aws.dynamodb.ConsumedWriteCapacityUnits) AS 'Write Units' WHERE collector.name = 'cloudwatch-metric-streams' TIMESERIES AUTO SINCE {{timeWindow}}"
+              }
+            ]
+          }
+        },
+        {
+          "title": "DynamoDB Throttled Requests",
+          "layout": {
+            "column": 7,
+            "row": 13,
+            "width": 6,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT sum(aws.dynamodb.UserErrors) AS 'User Errors', sum(aws.dynamodb.SystemErrors) AS 'System Errors' WHERE collector.name = 'cloudwatch-metric-streams' SINCE {{timeWindow}}"
+              }
+            ],
+            "thresholds": [
+              {
+                "alertSeverity": "CRITICAL",
+                "value": 1
+              }
+            ]
+          }
+        },
+        {
+          "title": "Lambda Invocations by Function Over Time",
+          "layout": {
+            "column": 1,
+            "row": 16,
+            "width": 12,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.area"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM Metric SELECT sum(aws.lambda.Invocations) WHERE collector.name = 'cloudwatch-metric-streams' FACET aws.lambda.FunctionName TIMESERIES AUTO SINCE {{timeWindow}}"
               }
             ]
           }
