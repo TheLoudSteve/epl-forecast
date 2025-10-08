@@ -175,7 +175,7 @@ def store_data(table, data: Dict[str, Any]) -> None:
     Store forecast data in DynamoDB
     """
     # Store with TTL of 7 days (604800 seconds)
-    # Provides safety buffer - data refreshes 2x daily but won't expire if there are issues
+    # Provides safety buffer - data refreshes daily but won't expire if there are issues
     ttl = int((datetime.now(timezone.utc).timestamp() + 604800))
     
     table.put_item(

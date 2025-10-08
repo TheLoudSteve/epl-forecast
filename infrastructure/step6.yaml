@@ -260,7 +260,7 @@ Resources:
       DisplayName: 'EPL Forecast Notifications'
 
 
-  # Scheduled data fetcher Lambda function (2x daily)
+  # Scheduled data fetcher Lambda function (1x daily)
   ScheduledDataFetcherFunction:
     Type: AWS::Lambda::Function
     Properties:

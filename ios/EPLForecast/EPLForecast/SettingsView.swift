@@ -225,7 +225,7 @@ struct SettingsView: View {
                 }
                 
                 Section {
-                    Text("Data updates every 2 minutes during live matches and twice daily otherwise. Forecasts are based on current points per game projected to a full 38-game season.")
+                    Text("Data updates every 2 minutes during live matches and once daily otherwise. Forecasts are based on current points per game projected to a full 38-game season.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }

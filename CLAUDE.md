@@ -17,8 +17,8 @@ EPL Forecast is an iOS app with AWS backend that provides English Premier League
 
 ### Backend Architecture
 - **API Gateway**: REST API v1 with CORS enabled
-- **Lambda Functions**: 
-  - `scheduled_data_fetcher.py` - Runs 2x daily (00:00/12:00 UTC) 
+- **Lambda Functions**:
+  - `scheduled_data_fetcher.py` - Runs 1x daily (00:00 UTC)
   - `live_match_fetcher.py` - Runs every 2 minutes in prod, only calls API during matches
   - `api_handler.py` - Handles /health, /table, /debug endpoints
 - **DynamoDB**: Stores forecast data with TTL
@@ -47,7 +47,7 @@ EPL Forecast is an iOS app with AWS backend that provides English Premier League
 
 ### Current Architecture (Dynamic Scheduling)
 - **scheduled_data_fetcher.py**:
-  - Runs at 00:00 and 12:00 UTC via cron
+  - Runs at 00:00 UTC via cron (once daily)
   - Prevents data staleness from DynamoDB TTL expiration
   - Always calls football-data.org API (no time checks)
 - **schedule_manager.py**:
@@ -59,7 +59,7 @@ EPL Forecast is an iOS app with AWS backend that provides English Premier League
   - Only runs when Schedule Manager enables the 2-minute polling rule
   - Triggered every 2 minutes during active match windows
   - Always calls football-data.org API when invoked (no internal time checks)
-- **Expected Usage**: 2 calls/day baseline + ~75 calls per match (2.5hr match window × 30 calls/hr)
+- **Expected Usage**: 1 call/day baseline + ~75 calls per match (2.5hr match window × 30 calls/hr)
 
 ## New Relic Integration
 
@@ -147,7 +147,7 @@ epl-forecast/
 ├── CLAUDE.md                          # This file
 ├── ios/EPLForecast/                    # iOS app
 ├── backend/
-│   ├── scheduled_data_fetcher.py       # 2x daily updates
+│   ├── scheduled_data_fetcher.py       # Daily baseline updates
 │   ├── live_match_fetcher.py          # Live match monitoring
 │   ├── api_handler.py                 # API Gateway endpoints
 │   └── requirements.txt               # Python dependencies
