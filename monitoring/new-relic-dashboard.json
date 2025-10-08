@@ -1,6 +1,6 @@
 {
-  "name": "Football API Monitoring",
-  "description": "Monitoring for football-data.org API calls from EPL Forecast backend",
+  "name": "EPLF",
+  "description": "EPL Forecast monitoring - API calls, business metrics, and system performance",
   "permissions": "PUBLIC_READ_WRITE",
   "variables": [
     {
@@ -650,7 +650,7 @@
             "nrqlQueries": [
               {
                 "accountId": 7052187,
-                "query": "FROM Metric SELECT sum(aws.apigateway.4XXError) AS '4xx Errors', sum(aws.apigateway.5XXError) AS '5xx Errors' WHERE collector.name = 'cloudwatch-metric-streams' TIMESERIES AUTO SINCE {{timeWindow}}"
+                "query": "FROM Metric SELECT sum(`aws.apigateway.4XXError`) AS '4xx Errors', sum(`aws.apigateway.5XXError`) AS '5xx Errors' WHERE collector.name = 'cloudwatch-metric-streams' TIMESERIES AUTO SINCE {{timeWindow}}"
               }
             ]
           }
