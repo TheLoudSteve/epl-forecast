@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPL Forecast - Premier League Table Predictions</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚽ EPL Forecast</h1>
+            <p class="subtitle">Predicted Final Premier League Table</p>
+        </header>
+
+        <div class="controls">
+            <button id="refreshBtn" class="btn-refresh">
+                <span class="refresh-icon">↻</span> Refresh
+            </button>
+            <div id="lastUpdated" class="last-updated"></div>
+        </div>
+
+        <div id="loading" class="loading">Loading forecast data...</div>
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="tableContainer" style="display: none;">
+            <div class="table-wrapper">
+                <table id="forecastTable" class="forecast-table">
+                    <thead>
+                        <tr>
+                            <th class="col-position">Pos</th>
+                            <th class="col-team">Team</th>
+                            <th class="col-stat">Played</th>
+                            <th class="col-stat">Points</th>
+                            <th class="col-stat">PPG</th>
+                            <th class="col-stat">GD</th>
+                            <th class="col-forecast">Forecast</th>
+                            <th class="col-change">Change</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <span class="change-indicator up">▲</span> Position will improve
+                </div>
+                <div class="legend-item">
+                    <span class="change-indicator down">▼</span> Position will drop
+                </div>
+                <div class="legend-item">
+                    <span class="change-indicator same">–</span> Position unchanged
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>Data updated daily from football-data.org API</p>
+            <p>Forecast based on current points per game over 38 matches</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
