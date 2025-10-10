@@ -40,14 +40,14 @@ async function loadForecastData(isManualRefresh = false) {
 
         const data = await response.json();
 
-        // Validate data structure
-        if (!data.teams || !Array.isArray(data.teams)) {
+        // Validate data structure - API uses 'forecast_table' not 'teams'
+        if (!data.forecast_table || !Array.isArray(data.forecast_table)) {
             throw new Error('Invalid data format received from API');
         }
 
         currentData = data;
-        renderTable(data);
-        updateLastUpdated(data.last_updated);
+        renderTable(data.forecast_table, data.metadata);
+        updateLastUpdated(data.metadata?.last_updated);
         hideLoading();
         hideError();
 
@@ -62,10 +62,10 @@ async function loadForecastData(isManualRefresh = false) {
 }
 
 // Render the forecast table
-function renderTable(data) {
+function renderTable(teams, metadata) {
     tableBody.innerHTML = '';
 
-    data.teams.forEach((team) => {
+    teams.forEach((team) => {
         const row = document.createElement('tr');
 
         // Calculate position change
