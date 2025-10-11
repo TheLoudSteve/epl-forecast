@@ -42,7 +42,10 @@ async function loadForecastData(isManualRefresh = false) {
 
         // Validate data structure - API uses 'forecast_table' not 'teams'
         if (!data.forecast_table || !Array.isArray(data.forecast_table)) {
-            throw new Error('Invalid data format received from API');
+            console.error('API Response:', data);
+            console.error('Has forecast_table:', 'forecast_table' in data);
+            console.error('forecast_table type:', typeof data.forecast_table);
+            throw new Error(`Invalid data format received from API. Keys: ${Object.keys(data).join(', ')}`);
         }
 
         currentData = data;
