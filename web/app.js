@@ -37,10 +37,12 @@ const tableContainer = document.getElementById('tableContainer');
 const tableBody = document.getElementById('tableBody');
 const forecastBtn = document.getElementById('forecastBtn');
 const liveBtn = document.getElementById('liveBtn');
+const favoriteTeamSelect = document.getElementById('favoriteTeam');
 
 // State
 let currentData = null;
 let currentView = 'forecast'; // 'forecast' or 'live'
+let favoriteTeam = localStorage.getItem('favoriteTeam') || '';
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
@@ -69,6 +71,19 @@ document.addEventListener('DOMContentLoaded', () => {
             if (currentData) {
                 renderTable(currentData.forecast_table, currentData.metadata);
             }
+        }
+    });
+
+    // Favorite team selector
+    favoriteTeamSelect.addEventListener('change', (e) => {
+        favoriteTeam = e.target.value;
+        if (favoriteTeam) {
+            localStorage.setItem('favoriteTeam', favoriteTeam);
+        } else {
+            localStorage.removeItem('favoriteTeam');
+        }
+        if (currentData) {
+            renderTable(currentData.forecast_table, currentData.metadata);
         }
     });
 });
@@ -121,6 +136,23 @@ async function loadForecastData(isManualRefresh = false) {
 function renderTable(teams, metadata) {
     tableBody.innerHTML = '';
 
+    // Populate team dropdown if empty
+    if (favoriteTeamSelect.options.length === 1) {
+        const sortedTeamNames = [...teams]
+            .map(t => t.name)
+            .sort();
+
+        sortedTeamNames.forEach(teamName => {
+            const option = document.createElement('option');
+            option.value = teamName;
+            option.textContent = teamName;
+            if (teamName === favoriteTeam) {
+                option.selected = true;
+            }
+            favoriteTeamSelect.appendChild(option);
+        });
+    }
+
     // Sort teams based on current view
     let sortedTeams;
     if (currentView === 'live') {
@@ -133,6 +165,13 @@ function renderTable(teams, metadata) {
 
     sortedTeams.forEach((team) => {
         const row = document.createElement('tr');
+
+        // Mark favorite team
+        const isFavorite = team.name === favoriteTeam;
+        if (isFavorite) {
+            row.classList.add('favorite-team');
+            row.id = 'favorite-team-row';
+        }
 
         // Calculate position change
         const currentPos = team.current_position;
@@ -188,6 +227,16 @@ function renderTable(teams, metadata) {
     });
 
     tableContainer.style.display = 'block';
+
+    // Scroll to favorite team if set
+    if (favoriteTeam) {
+        setTimeout(() => {
+            const favoriteRow = document.getElementById('favorite-team-row');
+            if (favoriteRow) {
+                favoriteRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 100);
+    }
 }
 
 // Update last updated timestamp
