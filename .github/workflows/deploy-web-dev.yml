@@ -1,4 +1,4 @@
-name: Deploy Web App
+name: Deploy Web to Dev
 
 on:
   push:
@@ -7,26 +7,18 @@ on:
     paths:
       - 'web/**'
       - 'infrastructure/web-hosting.yaml'
-      - '.github/workflows/deploy-web.yml'
+      - '.github/workflows/deploy-web-dev.yml'
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy to'
-        required: true
-        type: choice
-        options:
-          - dev
-          - prod
-        default: prod
 
 env:
   AWS_REGION: us-west-2
+  ENVIRONMENT: dev
 
 jobs:
   deploy-infrastructure:
-    name: Deploy CloudFront + S3 Infrastructure
+    name: Deploy CloudFront + S3 Infrastructure (Dev)
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'dev' }}
+    environment: dev
     outputs:
       bucket-name: ${{ steps.stack-outputs.outputs.bucket-name }}
       distribution-id: ${{ steps.stack-outputs.outputs.distribution-id }}
@@ -35,43 +27,23 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set environment
-      id: set-env
-      run: |
-        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-          echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
-        else
-          echo "environment=dev" >> $GITHUB_OUTPUT
-        fi
-
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        aws-access-key-id: ${{ steps.set-env.outputs.environment == 'prod' && secrets.AWS_ACCESS_KEY_ID_PROD || secrets.AWS_ACCESS_KEY_ID_DEV }}
-        aws-secret-access-key: ${{ steps.set-env.outputs.environment == 'prod' && secrets.AWS_SECRET_ACCESS_KEY_PROD || secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
         aws-region: ${{ env.AWS_REGION }}
 
     - name: Deploy CloudFormation stack
       run: |
-        # Set domain and certificate based on environment
-        if [ "${{ steps.set-env.outputs.environment }}" == "prod" ]; then
-          DOMAIN="epl.loudsteve.com"
-          ALTERNATE_DOMAIN="www.epl.loudsteve.com"
-          CERT_ARN="${{ secrets.CLOUDFRONT_CERT_ARN_PROD }}"
-        else
-          DOMAIN="dev.epl.loudsteve.com"
-          ALTERNATE_DOMAIN=""
-          CERT_ARN="${{ secrets.CLOUDFRONT_CERT_ARN_DEV }}"
-        fi
-
         aws cloudformation deploy \
           --template-file infrastructure/web-hosting.yaml \
-          --stack-name epl-forecast-web-${{ steps.set-env.outputs.environment }} \
+          --stack-name epl-forecast-web-dev \
           --parameter-overrides \
-            Environment=${{ steps.set-env.outputs.environment }} \
-            DomainName="${DOMAIN}" \
-            AlternateDomainName="${ALTERNATE_DOMAIN}" \
-            CertificateArn="${CERT_ARN}" \
+            Environment=dev \
+            DomainName="dev.epl.loudsteve.com" \
+            AlternateDomainName="" \
+            CertificateArn="${{ secrets.CLOUDFRONT_CERT_ARN_DEV }}" \
           --capabilities CAPABILITY_IAM \
           --region ${{ env.AWS_REGION }} \
           --no-fail-on-empty-changeset
@@ -80,19 +52,19 @@ jobs:
       id: stack-outputs
       run: |
         BUCKET_NAME=$(aws cloudformation describe-stacks \
-          --stack-name epl-forecast-web-${{ steps.set-env.outputs.environment }} \
+          --stack-name epl-forecast-web-dev \
           --region ${{ env.AWS_REGION }} \
           --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' \
           --output text)
 
         DISTRIBUTION_ID=$(aws cloudformation describe-stacks \
-          --stack-name epl-forecast-web-${{ steps.set-env.outputs.environment }} \
+          --stack-name epl-forecast-web-dev \
           --region ${{ env.AWS_REGION }} \
           --query 'Stacks[0].Outputs[?OutputKey==`DistributionId`].OutputValue' \
           --output text)
 
         WEBSITE_URL=$(aws cloudformation describe-stacks \
-          --stack-name epl-forecast-web-${{ steps.set-env.outputs.environment }} \
+          --stack-name epl-forecast-web-dev \
           --region ${{ env.AWS_REGION }} \
           --query 'Stacks[0].Outputs[?OutputKey==`WebsiteURL`].OutputValue' \
           --output text)
@@ -106,28 +78,19 @@ jobs:
         echo "URL: $WEBSITE_URL"
 
   deploy-web-app:
-    name: Deploy Web App Files
+    name: Deploy Web App Files (Dev)
     runs-on: ubuntu-latest
     needs: deploy-infrastructure
-    environment: ${{ github.event.inputs.environment || 'dev' }}
+    environment: dev
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set environment
-      id: set-env
-      run: |
-        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-          echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
-        else
-          echo "environment=dev" >> $GITHUB_OUTPUT
-        fi
-
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        aws-access-key-id: ${{ steps.set-env.outputs.environment == 'prod' && secrets.AWS_ACCESS_KEY_ID_PROD || secrets.AWS_ACCESS_KEY_ID_DEV }}
-        aws-secret-access-key: ${{ steps.set-env.outputs.environment == 'prod' && secrets.AWS_SECRET_ACCESS_KEY_PROD || secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
         aws-region: ${{ env.AWS_REGION }}
 
     - name: Sync web files to S3
@@ -152,21 +115,20 @@ jobs:
           --cache-control "public, max-age=300, s-maxage=300" \
           --region ${{ env.AWS_REGION }}
 
-        # Set content type for CSS files (no cache for dev, 24h for prod)
-        CACHE_TIME=${{ steps.set-env.outputs.environment == 'prod' && '86400' || '0' }}
+        # Set content type for CSS files (no cache for dev)
         aws s3 cp s3://${{ needs.deploy-infrastructure.outputs.bucket-name }}/styles.css \
           s3://${{ needs.deploy-infrastructure.outputs.bucket-name }}/styles.css \
           --content-type "text/css; charset=utf-8" \
           --metadata-directive REPLACE \
-          --cache-control "public, max-age=${CACHE_TIME}, s-maxage=${CACHE_TIME}, must-revalidate" \
+          --cache-control "public, max-age=0, s-maxage=0, must-revalidate" \
           --region ${{ env.AWS_REGION }}
 
-        # Set content type for JS files (no cache for dev, 24h for prod)
+        # Set content type for JS files (no cache for dev)
         aws s3 cp s3://${{ needs.deploy-infrastructure.outputs.bucket-name }}/app.js \
           s3://${{ needs.deploy-infrastructure.outputs.bucket-name }}/app.js \
           --content-type "application/javascript; charset=utf-8" \
           --metadata-directive REPLACE \
-          --cache-control "public, max-age=${CACHE_TIME}, s-maxage=${CACHE_TIME}, must-revalidate" \
+          --cache-control "public, max-age=0, s-maxage=0, must-revalidate" \
           --region ${{ env.AWS_REGION }}
 
         echo "✅ Content types set correctly"
@@ -182,9 +144,9 @@ jobs:
 
     - name: Deployment summary
       run: |
-        echo "## 🎉 Web App Deployment Complete!" >> $GITHUB_STEP_SUMMARY
+        echo "## 🎉 Web App Deployment Complete (Dev)!" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Environment:** ${{ steps.set-env.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment:** dev" >> $GITHUB_STEP_SUMMARY
         echo "**S3 Bucket:** ${{ needs.deploy-infrastructure.outputs.bucket-name }}" >> $GITHUB_STEP_SUMMARY
         echo "**CloudFront Distribution:** ${{ needs.deploy-infrastructure.outputs.distribution-id }}" >> $GITHUB_STEP_SUMMARY
         echo "**Website URL:** ${{ needs.deploy-infrastructure.outputs.website-url }}" >> $GITHUB_STEP_SUMMARY
@@ -194,6 +156,6 @@ jobs:
 
         echo ""
         echo "================================================"
-        echo "✅ Deployment successful!"
+        echo "✅ Dev deployment successful!"
         echo "🌐 Website URL: ${{ needs.deploy-infrastructure.outputs.website-url }}"
         echo "================================================"
