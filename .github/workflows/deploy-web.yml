@@ -138,20 +138,21 @@ jobs:
           --cache-control "public, max-age=300, s-maxage=300" \
           --region ${{ env.AWS_REGION }}
 
-        # Set content type for CSS files
+        # Set content type for CSS files (no cache for dev, 24h for prod)
+        CACHE_TIME=${{ steps.set-env.outputs.environment == 'prod' && '86400' || '0' }}
         aws s3 cp s3://${{ needs.deploy-infrastructure.outputs.bucket-name }}/styles.css \
           s3://${{ needs.deploy-infrastructure.outputs.bucket-name }}/styles.css \
           --content-type "text/css; charset=utf-8" \
           --metadata-directive REPLACE \
-          --cache-control "public, max-age=86400, s-maxage=86400" \
+          --cache-control "public, max-age=${CACHE_TIME}, s-maxage=${CACHE_TIME}, must-revalidate" \
           --region ${{ env.AWS_REGION }}
 
-        # Set content type for JS files
+        # Set content type for JS files (no cache for dev, 24h for prod)
         aws s3 cp s3://${{ needs.deploy-infrastructure.outputs.bucket-name }}/app.js \
           s3://${{ needs.deploy-infrastructure.outputs.bucket-name }}/app.js \
           --content-type "application/javascript; charset=utf-8" \
           --metadata-directive REPLACE \
-          --cache-control "public, max-age=86400, s-maxage=86400" \
+          --cache-control "public, max-age=${CACHE_TIME}, s-maxage=${CACHE_TIME}, must-revalidate" \
           --region ${{ env.AWS_REGION }}
 
         echo "✅ Content types set correctly"
