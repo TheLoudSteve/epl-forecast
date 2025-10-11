@@ -22,7 +22,7 @@ const TEAM_LOGOS = {
     'Newcastle United FC': 'https://crests.football-data.org/67.png',
     'Nottingham Forest FC': 'https://crests.football-data.org/351.png',
     'Southampton FC': 'https://crests.football-data.org/340.png',
-    'Sunderland AFC': 'https://crests.football-data.org/1049.png',
+    'Sunderland AFC': 'https://crests.football-data.org/71.png',
     'Tottenham Hotspur FC': 'https://crests.football-data.org/73.png',
     'West Ham United FC': 'https://crests.football-data.org/563.png',
     'Wolverhampton Wanderers FC': 'https://crests.football-data.org/76.png'
@@ -35,15 +35,41 @@ const loadingEl = document.getElementById('loading');
 const errorEl = document.getElementById('error');
 const tableContainer = document.getElementById('tableContainer');
 const tableBody = document.getElementById('tableBody');
+const forecastBtn = document.getElementById('forecastBtn');
+const liveBtn = document.getElementById('liveBtn');
 
 // State
 let currentData = null;
+let currentView = 'forecast'; // 'forecast' or 'live'
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
     loadForecastData();
     refreshBtn.addEventListener('click', () => {
         loadForecastData(true);
+    });
+
+    // Toggle button listeners
+    forecastBtn.addEventListener('click', () => {
+        if (currentView !== 'forecast') {
+            currentView = 'forecast';
+            forecastBtn.classList.add('active');
+            liveBtn.classList.remove('active');
+            if (currentData) {
+                renderTable(currentData.forecast_table, currentData.metadata);
+            }
+        }
+    });
+
+    liveBtn.addEventListener('click', () => {
+        if (currentView !== 'live') {
+            currentView = 'live';
+            liveBtn.classList.add('active');
+            forecastBtn.classList.remove('active');
+            if (currentData) {
+                renderTable(currentData.forecast_table, currentData.metadata);
+            }
+        }
     });
 });
 
@@ -95,7 +121,17 @@ async function loadForecastData(isManualRefresh = false) {
 function renderTable(teams, metadata) {
     tableBody.innerHTML = '';
 
-    teams.forEach((team) => {
+    // Sort teams based on current view
+    let sortedTeams;
+    if (currentView === 'live') {
+        // Sort by current position
+        sortedTeams = [...teams].sort((a, b) => a.current_position - b.current_position);
+    } else {
+        // Sort by forecasted position
+        sortedTeams = [...teams].sort((a, b) => a.forecasted_position - b.forecasted_position);
+    }
+
+    sortedTeams.forEach((team) => {
         const row = document.createElement('tr');
 
         // Calculate position change
@@ -123,8 +159,12 @@ function renderTable(teams, metadata) {
 
         const logoUrl = TEAM_LOGOS[team.name] || '';
 
+        // Determine which position and points to display
+        const displayPosition = currentView === 'live' ? currentPos : forecastPos;
+        const displayPoints = currentView === 'live' ? team.points : formatDecimal(team.forecasted_points);
+
         row.innerHTML = `
-            <td class="col-position">${forecastPos}</td>
+            <td class="col-position">${displayPosition}</td>
             <td class="col-team">
                 <div class="team-info">
                     ${logoUrl ? `<img src="${logoUrl}" alt="${escapeHtml(team.name)}" class="team-logo" onerror="this.style.display='none'">` : ''}
@@ -136,7 +176,7 @@ function renderTable(teams, metadata) {
             <td class="col-stat">${formatDecimal(team.points_per_game)}</td>
             <td class="col-stat">${team.goal_difference >= 0 ? '+' : ''}${team.goal_difference}</td>
             <td class="col-forecast">
-                <span class="forecast-position">${formatDecimal(team.forecasted_points)}</span>
+                <span class="forecast-position">${displayPoints}</span>
             </td>
             <td class="col-change">
                 <span class="change-indicator ${changeClass}">${changeIndicator}</span>

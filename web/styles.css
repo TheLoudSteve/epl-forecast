@@ -60,6 +60,43 @@ h1 {
     color: var(--text-secondary);
 }
 
+.view-toggle {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    margin: 20px 0;
+}
+
+.toggle-btn {
+    background-color: var(--surface);
+    color: var(--text-primary);
+    border: 2px solid var(--primary-color);
+    padding: 12px 32px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.toggle-btn:first-child {
+    border-radius: 8px 0 0 8px;
+    border-right: 1px solid var(--primary-color);
+}
+
+.toggle-btn:last-child {
+    border-radius: 0 8px 8px 0;
+    border-left: 1px solid var(--primary-color);
+}
+
+.toggle-btn.active {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.toggle-btn:hover:not(.active) {
+    background-color: var(--border);
+}
+
 .controls {
     display: flex;
     justify-content: space-between;
