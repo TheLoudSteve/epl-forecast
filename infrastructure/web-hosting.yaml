@@ -15,6 +15,11 @@ Parameters:
     Description: Custom domain name (optional, leave blank for CloudFront domain)
     Default: ''
 
+  AlternateDomainName:
+    Type: String
+    Description: Alternate domain name for production (e.g., www subdomain)
+    Default: ''
+
   CertificateArn:
     Type: String
     Description: ACM Certificate ARN for custom domain (required if using custom domain)
@@ -22,6 +27,7 @@ Parameters:
 
 Conditions:
   HasCustomDomain: !Not [!Equals [!Ref DomainName, '']]
+  HasAlternateDomain: !Not [!Equals [!Ref AlternateDomainName, '']]
   HasCertificate: !Not [!Equals [!Ref CertificateArn, '']]
 
 Resources:
@@ -91,7 +97,10 @@ Resources:
         # Custom domain configuration (if provided)
         Aliases: !If
           - HasCustomDomain
-          - [!Ref DomainName]
+          - !If
+            - HasAlternateDomain
+            - [!Ref DomainName, !Ref AlternateDomainName]
+            - [!Ref DomainName]
           - !Ref AWS::NoValue
 
         ViewerCertificate: !If

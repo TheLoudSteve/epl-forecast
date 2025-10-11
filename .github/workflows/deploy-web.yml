@@ -53,11 +53,25 @@ jobs:
 
     - name: Deploy CloudFormation stack
       run: |
+        # Set domain and certificate based on environment
+        if [ "${{ steps.set-env.outputs.environment }}" == "prod" ]; then
+          DOMAIN="epl.loudsteve.com"
+          ALTERNATE_DOMAIN="www.epl.loudsteve.com"
+          CERT_ARN="${{ secrets.CLOUDFRONT_CERT_ARN_PROD }}"
+        else
+          DOMAIN="dev.epl.loudsteve.com"
+          ALTERNATE_DOMAIN=""
+          CERT_ARN="${{ secrets.CLOUDFRONT_CERT_ARN_DEV }}"
+        fi
+
         aws cloudformation deploy \
           --template-file infrastructure/web-hosting.yaml \
           --stack-name epl-forecast-web-${{ steps.set-env.outputs.environment }} \
           --parameter-overrides \
             Environment=${{ steps.set-env.outputs.environment }} \
+            DomainName="${DOMAIN}" \
+            AlternateDomainName="${ALTERNATE_DOMAIN}" \
+            CertificateArn="${CERT_ARN}" \
           --capabilities CAPABILITY_IAM \
           --region ${{ env.AWS_REGION }} \
           --no-fail-on-empty-changeset
