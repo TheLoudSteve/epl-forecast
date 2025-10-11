@@ -173,7 +173,7 @@ h1 {
 }
 
 .col-team {
-    min-width: 180px;
+    min-width: 200px;
 }
 
 .col-stat {
@@ -191,8 +191,22 @@ h1 {
     text-align: center !important;
 }
 
+.team-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.team-logo {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
 .team-name {
     font-weight: 600;
+    flex: 1;
 }
 
 .forecast-position {

@@ -1,6 +1,30 @@
 // EPL Forecast Web App
 const API_ENDPOINT = 'https://aiighxj72l.execute-api.us-west-2.amazonaws.com/prod/table';
 
+// Team logo mapping (using crests.football-data.org)
+const TEAM_LOGOS = {
+    'Arsenal FC': 'https://crests.football-data.org/57.png',
+    'Aston Villa FC': 'https://crests.football-data.org/58.png',
+    'AFC Bournemouth': 'https://crests.football-data.org/1044.png',
+    'Brentford FC': 'https://crests.football-data.org/402.png',
+    'Brighton & Hove Albion FC': 'https://crests.football-data.org/397.png',
+    'Chelsea FC': 'https://crests.football-data.org/61.png',
+    'Crystal Palace FC': 'https://crests.football-data.org/354.png',
+    'Everton FC': 'https://crests.football-data.org/62.png',
+    'Fulham FC': 'https://crests.football-data.org/63.png',
+    'Ipswich Town FC': 'https://crests.football-data.org/349.png',
+    'Leicester City FC': 'https://crests.football-data.org/338.png',
+    'Liverpool FC': 'https://crests.football-data.org/64.png',
+    'Manchester City FC': 'https://crests.football-data.org/65.png',
+    'Manchester United FC': 'https://crests.football-data.org/66.png',
+    'Newcastle United FC': 'https://crests.football-data.org/67.png',
+    'Nottingham Forest FC': 'https://crests.football-data.org/351.png',
+    'Southampton FC': 'https://crests.football-data.org/340.png',
+    'Tottenham Hotspur FC': 'https://crests.football-data.org/73.png',
+    'West Ham United FC': 'https://crests.football-data.org/563.png',
+    'Wolverhampton Wanderers FC': 'https://crests.football-data.org/76.png'
+};
+
 // DOM elements
 const refreshBtn = document.getElementById('refreshBtn');
 const lastUpdatedEl = document.getElementById('lastUpdated');
@@ -94,10 +118,15 @@ function renderTable(teams, metadata) {
             changeText = '0';
         }
 
+        const logoUrl = TEAM_LOGOS[team.name] || '';
+
         row.innerHTML = `
             <td class="col-position">${forecastPos}</td>
             <td class="col-team">
-                <span class="team-name">${escapeHtml(team.name)}</span>
+                <div class="team-info">
+                    ${logoUrl ? `<img src="${logoUrl}" alt="${escapeHtml(team.name)}" class="team-logo" onerror="this.style.display='none'">` : ''}
+                    <span class="team-name">${escapeHtml(team.name)}</span>
+                </div>
             </td>
             <td class="col-stat">${team.played}</td>
             <td class="col-stat">${team.points}</td>
