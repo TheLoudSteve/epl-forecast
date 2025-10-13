@@ -742,6 +742,462 @@
           }
         }
       ]
+    },
+    {
+      "name": "Web Performance (RUM)",
+      "description": "Real User Monitoring - Browser performance, page loads, and user experience",
+      "widgets": [
+        {
+          "title": "Page Views (24h)",
+          "layout": {
+            "column": 1,
+            "row": 1,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM PageView SELECT count(*) AS 'Total Page Views' SINCE {{timeWindow}}"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Unique Sessions",
+          "layout": {
+            "column": 5,
+            "row": 1,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM PageView SELECT uniqueCount(session) AS 'Unique Sessions' SINCE {{timeWindow}}"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Avg Page Load Time",
+          "layout": {
+            "column": 9,
+            "row": 1,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM PageView SELECT average(duration) AS 'Avg Load Time (s)' SINCE {{timeWindow}}"
+              }
+            ],
+            "thresholds": [
+              {
+                "alertSeverity": "WARNING",
+                "value": 3
+              },
+              {
+                "alertSeverity": "CRITICAL",
+                "value": 5
+              }
+            ]
+          }
+        },
+        {
+          "title": "Page Views Over Time",
+          "layout": {
+            "column": 1,
+            "row": 4,
+            "width": 8,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM PageView SELECT count(*) TIMESERIES AUTO SINCE {{timeWindow}}"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Browser Breakdown",
+          "layout": {
+            "column": 9,
+            "row": 4,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.pie"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM PageView SELECT count(*) FACET userAgentName SINCE {{timeWindow}}"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Page Load Performance",
+          "layout": {
+            "column": 1,
+            "row": 7,
+            "width": 6,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM PageView SELECT average(duration) AS 'Avg', percentile(duration, 50) AS 'p50', percentile(duration, 75) AS 'p75', percentile(duration, 95) AS 'p95' TIMESERIES AUTO SINCE {{timeWindow}}"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Device Type Breakdown",
+          "layout": {
+            "column": 7,
+            "row": 7,
+            "width": 6,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.bar"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM PageView SELECT count(*) FACET deviceType SINCE {{timeWindow}}"
+              }
+            ]
+          }
+        },
+        {
+          "title": "JavaScript Errors",
+          "layout": {
+            "column": 1,
+            "row": 10,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM JavaScriptError SELECT count(*) AS 'Total JS Errors' SINCE {{timeWindow}}"
+              }
+            ],
+            "thresholds": [
+              {
+                "alertSeverity": "WARNING",
+                "value": 10
+              },
+              {
+                "alertSeverity": "CRITICAL",
+                "value": 50
+              }
+            ]
+          }
+        },
+        {
+          "title": "Error Rate %",
+          "layout": {
+            "column": 5,
+            "row": 10,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "SELECT (filter(count(*), WHERE eventType() = 'JavaScriptError') / filter(count(*), WHERE eventType() = 'PageView')) * 100 AS 'Error Rate %' FROM JavaScriptError, PageView SINCE {{timeWindow}}"
+              }
+            ],
+            "thresholds": [
+              {
+                "alertSeverity": "WARNING",
+                "value": 1
+              },
+              {
+                "alertSeverity": "CRITICAL",
+                "value": 5
+              }
+            ]
+          }
+        },
+        {
+          "title": "AJAX Response Time",
+          "layout": {
+            "column": 9,
+            "row": 10,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM AjaxRequest SELECT average(duration) AS 'Avg AJAX Time (s)' SINCE {{timeWindow}}"
+              }
+            ],
+            "thresholds": [
+              {
+                "alertSeverity": "WARNING",
+                "value": 2
+              },
+              {
+                "alertSeverity": "CRITICAL",
+                "value": 5
+              }
+            ]
+          }
+        },
+        {
+          "title": "AJAX Requests Over Time",
+          "layout": {
+            "column": 1,
+            "row": 13,
+            "width": 8,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM AjaxRequest SELECT count(*) TIMESERIES AUTO SINCE {{timeWindow}}"
+              }
+            ]
+          }
+        },
+        {
+          "title": "AJAX Status Codes",
+          "layout": {
+            "column": 9,
+            "row": 13,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.bar"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM AjaxRequest SELECT count(*) FACET httpResponseCode SINCE {{timeWindow}}"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Top JavaScript Errors",
+          "layout": {
+            "column": 1,
+            "row": 16,
+            "width": 12,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.table"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM JavaScriptError SELECT count(*) AS 'Count', latest(errorMessage) AS 'Message', latest(stackTrace) AS 'Stack Trace' FACET errorClass SINCE {{timeWindow}} LIMIT 10"
+              }
+            ]
+          }
+        },
+        {
+          "title": "AJAX Endpoints Performance",
+          "layout": {
+            "column": 1,
+            "row": 19,
+            "width": 12,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.table"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM AjaxRequest SELECT count(*) AS 'Requests', average(duration) AS 'Avg Duration (s)', percentile(duration, 95) AS 'p95 Duration', filter(count(*), WHERE httpResponseCode >= 400) AS 'Errors' FACET requestUrl SINCE {{timeWindow}} LIMIT 10"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Core Web Vitals - LCP",
+          "layout": {
+            "column": 1,
+            "row": 22,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM PageViewTiming SELECT percentile(largestContentfulPaint, 75) AS 'LCP p75 (s)' WHERE largestContentfulPaint IS NOT NULL SINCE {{timeWindow}}"
+              }
+            ],
+            "thresholds": [
+              {
+                "alertSeverity": "WARNING",
+                "value": 2.5
+              },
+              {
+                "alertSeverity": "CRITICAL",
+                "value": 4
+              }
+            ]
+          }
+        },
+        {
+          "title": "Core Web Vitals - FID",
+          "layout": {
+            "column": 5,
+            "row": 22,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM PageViewTiming SELECT percentile(firstInputDelay, 75) AS 'FID p75 (ms)' WHERE firstInputDelay IS NOT NULL SINCE {{timeWindow}}"
+              }
+            ],
+            "thresholds": [
+              {
+                "alertSeverity": "WARNING",
+                "value": 100
+              },
+              {
+                "alertSeverity": "CRITICAL",
+                "value": 300
+              }
+            ]
+          }
+        },
+        {
+          "title": "Core Web Vitals - CLS",
+          "layout": {
+            "column": 9,
+            "row": 22,
+            "width": 4,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM PageViewTiming SELECT percentile(cumulativeLayoutShift, 75) AS 'CLS p75' WHERE cumulativeLayoutShift IS NOT NULL SINCE {{timeWindow}}"
+              }
+            ],
+            "thresholds": [
+              {
+                "alertSeverity": "WARNING",
+                "value": 0.1
+              },
+              {
+                "alertSeverity": "CRITICAL",
+                "value": 0.25
+              }
+            ]
+          }
+        },
+        {
+          "title": "Session Replay Count",
+          "layout": {
+            "column": 1,
+            "row": 25,
+            "width": 6,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM PageView SELECT uniqueCount(session) WHERE session IS NOT NULL TIMESERIES AUTO SINCE {{timeWindow}}"
+              }
+            ]
+          }
+        },
+        {
+          "title": "Geographic Distribution",
+          "layout": {
+            "column": 7,
+            "row": 25,
+            "width": 6,
+            "height": 3
+          },
+          "visualization": {
+            "id": "viz.table"
+          },
+          "rawConfiguration": {
+            "nrqlQueries": [
+              {
+                "accountId": 7052187,
+                "query": "FROM PageView SELECT count(*) AS 'Page Views', average(duration) AS 'Avg Load Time' FACET countryCode, city SINCE {{timeWindow}} LIMIT 20"
+              }
+            ]
+          }
+        }
+      ]
     }
   ]
 }
