@@ -173,53 +173,39 @@ function renderTable(teams, metadata) {
             row.id = 'favorite-team-row';
         }
 
-        // Calculate position change
-        const currentPos = team.current_position;
-        const forecastPos = team.forecasted_position;
-        const posChange = currentPos - forecastPos;
-
-        let changeIndicator = '';
-        let changeClass = '';
-        let changeText = '';
-
-        if (posChange > 0) {
-            changeIndicator = '▲';
-            changeClass = 'up';
-            changeText = `+${posChange}`;
-        } else if (posChange < 0) {
-            changeIndicator = '▼';
-            changeClass = 'down';
-            changeText = `${posChange}`;
-        } else {
-            changeIndicator = '–';
-            changeClass = 'same';
-            changeText = '0';
-        }
-
         const logoUrl = TEAM_LOGOS[team.name] || '';
 
         // Determine which position and points to display
-        const displayPosition = currentView === 'live' ? currentPos : forecastPos;
-        const displayPoints = currentView === 'live' ? team.points : formatDecimal(team.forecasted_points);
+        const displayPosition = currentView === 'live' ? team.current_position : team.forecasted_position;
+        const displayPoints = currentView === 'live' ? team.points : Math.round(team.forecasted_points);
+        const pointsLabel = currentView === 'live' ? 'pts' : 'proj';
+
+        // Determine position-based color class
+        let positionClass = 'position-mid-table';
+        if (displayPosition <= 4) {
+            positionClass = 'position-champions-league';
+        } else if (displayPosition >= 18) {
+            positionClass = 'position-relegation';
+        }
 
         row.innerHTML = `
-            <td class="col-position">${displayPosition}</td>
             <td class="col-team">
                 <div class="team-info">
-                    ${logoUrl ? `<img src="${logoUrl}" alt="${escapeHtml(team.name)}" class="team-logo" onerror="this.style.display='none'">` : ''}
-                    <span class="team-name">${escapeHtml(team.name)}</span>
+                    <div class="team-content">
+                        <span class="position-indicator ${positionClass}">${displayPosition}</span>
+                        ${logoUrl ? `<img src="${logoUrl}" alt="${escapeHtml(team.name)}" class="team-logo" onerror="this.style.display='none'">` : ''}
+                        <div class="team-details">
+                            <span class="team-name">${escapeHtml(team.name)}</span>
+                            <span class="team-stats">${team.played} GP | ${team.points} PTS | ${formatDecimal(team.points_per_game)} PPG</span>
+                        </div>
+                    </div>
                 </div>
             </td>
-            <td class="col-stat">${team.played}</td>
-            <td class="col-stat">${team.points}</td>
-            <td class="col-stat">${formatDecimal(team.points_per_game)}</td>
-            <td class="col-stat">${team.goal_difference >= 0 ? '+' : ''}${team.goal_difference}</td>
             <td class="col-forecast">
-                <span class="forecast-position">${displayPoints}</span>
-            </td>
-            <td class="col-change">
-                <span class="change-indicator ${changeClass}">${changeIndicator}</span>
-                <span class="change-value">${changeText}</span>
+                <div class="forecast-points">
+                    <span class="forecast-points-value ${isFavorite ? positionClass : ''}">${displayPoints}</span>
+                    <span class="forecast-points-label">${pointsLabel}</span>
+                </div>
             </td>
         `;
 
