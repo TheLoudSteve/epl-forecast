@@ -64,37 +64,38 @@ h1 {
     display: flex;
     justify-content: center;
     gap: 0;
-    margin: 20px 0;
+    margin: 16px 0;
 }
 
 .toggle-btn {
-    background-color: var(--surface);
-    color: var(--text-primary);
-    border: 2px solid var(--primary-color);
-    padding: 12px 32px;
-    font-size: 1rem;
-    font-weight: 600;
+    background-color: transparent;
+    color: #007AFF;
+    border: 1px solid #007AFF;
+    padding: 6px 0;
+    font-size: 0.85rem;
+    font-weight: 500;
     cursor: pointer;
     transition: all 0.3s ease;
+    width: 75px;
 }
 
 .toggle-btn:first-child {
-    border-radius: 8px 0 0 8px;
-    border-right: 1px solid var(--primary-color);
+    border-radius: 16px 0 0 16px;
+    border-right: 0.5px solid #007AFF;
 }
 
 .toggle-btn:last-child {
-    border-radius: 0 8px 8px 0;
-    border-left: 1px solid var(--primary-color);
+    border-radius: 0 16px 16px 0;
+    border-left: 0.5px solid #007AFF;
 }
 
 .toggle-btn.active {
-    background-color: var(--primary-color);
+    background-color: #007AFF;
     color: white;
 }
 
 .toggle-btn:hover:not(.active) {
-    background-color: var(--border);
+    background-color: rgba(0, 122, 255, 0.1);
 }
 
 .controls {
@@ -140,41 +141,23 @@ h1 {
     box-shadow: 0 0 0 3px rgba(56, 0, 60, 0.1);
 }
 
-.btn-refresh {
-    background-color: var(--primary-color);
-    color: white;
+.hamburger-btn {
+    background-color: transparent;
     border: none;
-    padding: 10px 20px;
-    border-radius: 8px;
-    font-size: 1rem;
+    padding: 8px 12px;
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    font-size: 1.5rem;
+    color: var(--text-primary);
     transition: all 0.3s ease;
 }
 
-.btn-refresh:hover {
-    background-color: var(--secondary-color);
-    transform: translateY(-2px);
+.hamburger-btn:hover {
+    background-color: var(--surface);
+    border-radius: 8px;
 }
 
-.btn-refresh:active {
-    transform: translateY(0);
-}
-
-.refresh-icon {
-    font-size: 1.3rem;
+.hamburger-icon {
     display: inline-block;
-}
-
-.btn-refresh.loading .refresh-icon {
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
 }
 
 .last-updated {

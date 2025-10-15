@@ -29,7 +29,6 @@ const TEAM_LOGOS = {
 };
 
 // DOM elements
-const refreshBtn = document.getElementById('refreshBtn');
 const lastUpdatedEl = document.getElementById('lastUpdated');
 const loadingEl = document.getElementById('loading');
 const errorEl = document.getElementById('error');
@@ -38,6 +37,8 @@ const tableBody = document.getElementById('tableBody');
 const forecastBtn = document.getElementById('forecastBtn');
 const liveBtn = document.getElementById('liveBtn');
 const favoriteTeamSelect = document.getElementById('favoriteTeam');
+const hamburgerBtn = document.getElementById('hamburgerBtn');
+const favoriteTeamSelector = document.getElementById('favoriteTeamSelector');
 
 // State
 let currentData = null;
@@ -47,9 +48,12 @@ let favoriteTeam = localStorage.getItem('favoriteTeam') || '';
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
     loadForecastData();
-    refreshBtn.addEventListener('click', () => {
-        loadForecastData(true);
-    });
+
+    // Show hamburger if favorite team is already set
+    if (favoriteTeam) {
+        favoriteTeamSelector.style.display = 'none';
+        hamburgerBtn.style.display = 'block';
+    }
 
     // Toggle button listeners
     forecastBtn.addEventListener('click', () => {
@@ -74,11 +78,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Hamburger menu toggle
+    hamburgerBtn.addEventListener('click', () => {
+        if (favoriteTeamSelector.style.display === 'none') {
+            favoriteTeamSelector.style.display = 'flex';
+            hamburgerBtn.style.display = 'none';
+        }
+    });
+
     // Favorite team selector
     favoriteTeamSelect.addEventListener('change', (e) => {
         favoriteTeam = e.target.value;
         if (favoriteTeam) {
             localStorage.setItem('favoriteTeam', favoriteTeam);
+            // Hide selector, show hamburger
+            favoriteTeamSelector.style.display = 'none';
+            hamburgerBtn.style.display = 'block';
         } else {
             localStorage.removeItem('favoriteTeam');
         }
@@ -89,15 +104,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Load forecast data from API
-async function loadForecastData(isManualRefresh = false) {
+async function loadForecastData() {
     try {
-        // Show loading state
-        if (isManualRefresh) {
-            refreshBtn.classList.add('loading');
-            refreshBtn.disabled = true;
-        } else {
-            showLoading();
-        }
+        showLoading();
 
         // Fetch data
         const response = await fetch(API_ENDPOINT);
@@ -126,9 +135,6 @@ async function loadForecastData(isManualRefresh = false) {
         console.error('Error loading forecast data:', error);
         showError(`Failed to load forecast data: ${error.message}`);
         hideLoading();
-    } finally {
-        refreshBtn.classList.remove('loading');
-        refreshBtn.disabled = false;
     }
 }
 

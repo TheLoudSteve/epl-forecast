@@ -28,15 +28,15 @@
         </div>
 
         <div class="controls">
-            <div class="favorite-team-selector">
+            <button id="hamburgerBtn" class="hamburger-btn" style="display: none;">
+                <span class="hamburger-icon">☰</span>
+            </button>
+            <div id="favoriteTeamSelector" class="favorite-team-selector">
                 <label for="favoriteTeam">Favorite Team:</label>
                 <select id="favoriteTeam" class="team-dropdown">
                     <option value="">Select a team...</option>
                 </select>
             </div>
-            <button id="refreshBtn" class="btn-refresh">
-                <span class="refresh-icon">↻</span> Refresh
-            </button>
             <div id="lastUpdated" class="last-updated"></div>
         </div>
 
