@@ -241,6 +241,126 @@ Resources:
                   - tag:GetResources
                 Resource: '*'
 
+  # S3 bucket for Firehose backup (failed metric stream data)
+  MetricStreamBackupBucket:
+    Type: AWS::S3::Bucket
+    Condition: EnableNewRelic
+    Properties:
+      BucketName: !Sub 'epl-metric-stream-backup-${Environment}-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldBackups
+            Status: Enabled
+            ExpirationInDays: 7
+
+  # IAM role for Kinesis Firehose
+  MetricStreamFirehoseRole:
+    Type: AWS::IAM::Role
+    Condition: EnableNewRelic
+    Properties:
+      RoleName: !Sub 'MetricStreamFirehoseRole-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: firehose.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: FirehoseS3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:AbortMultipartUpload
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - s3:ListBucketMultipartUploads
+                  - s3:PutObject
+                Resource:
+                  - !GetAtt MetricStreamBackupBucket.Arn
+                  - !Sub '${MetricStreamBackupBucket.Arn}/*'
+
+  # IAM role for CloudWatch Metric Stream
+  MetricStreamRole:
+    Type: AWS::IAM::Role
+    Condition: EnableNewRelic
+    Properties:
+      RoleName: !Sub 'MetricStreamRole-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: streams.metrics.cloudwatch.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: MetricStreamFirehoseAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - firehose:PutRecord
+                  - firehose:PutRecordBatch
+                Resource: !GetAtt MetricStreamFirehoseDeliveryStream.Arn
+
+  # Kinesis Firehose delivery stream to New Relic
+  MetricStreamFirehoseDeliveryStream:
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Condition: EnableNewRelic
+    Properties:
+      DeliveryStreamName: !Sub 'NewRelic-Metric-Stream-${Environment}'
+      DeliveryStreamType: DirectPut
+      HttpEndpointDestinationConfiguration:
+        EndpointConfiguration:
+          Url: https://aws-api.newrelic.com/cloudwatch-metrics/v1
+          Name: New Relic
+          AccessKey: !Ref NewRelicLicenseKey
+        RequestConfiguration:
+          ContentEncoding: GZIP
+          CommonAttributes:
+            - AttributeName: environment
+              AttributeValue: !Ref Environment
+        BufferingHints:
+          SizeInMBs: 1
+          IntervalInSeconds: 60
+        RetryOptions:
+          DurationInSeconds: 60
+        S3BackupMode: FailedDataOnly
+        S3Configuration:
+          BucketARN: !GetAtt MetricStreamBackupBucket.Arn
+          RoleARN: !GetAtt MetricStreamFirehoseRole.Arn
+          BufferingHints:
+            SizeInMBs: 5
+            IntervalInSeconds: 300
+          CompressionFormat: GZIP
+        RoleARN: !GetAtt MetricStreamFirehoseRole.Arn
+
+  # CloudWatch Metric Stream with namespace filters
+  NewRelicMetricStream:
+    Type: AWS::CloudWatch::MetricStream
+    Condition: EnableNewRelic
+    Properties:
+      Name: !Sub 'NewRelic-Metric-Stream-${Environment}'
+      RoleArn: !GetAtt MetricStreamRole.Arn
+      FirehoseArn: !GetAtt MetricStreamFirehoseDeliveryStream.Arn
+      OutputFormat: opentelemetry0.7
+      IncludeFilters:
+        - Namespace: AWS/ApiGateway
+        - Namespace: AWS/DynamoDB
+        - Namespace: AWS/Events
+        - Namespace: AWS/SQS
+      # Note: AWS/Lambda is intentionally excluded since Lambda functions
+      # already have New Relic agents sending telemetry directly
+
   # SNS Platform Application for APNS (iOS push notifications)
   # TODO: Re-enable when we have APNS certificates configured
   # APNSPlatformApplication:
@@ -796,3 +916,24 @@ Outputs:
     Value: !GetAtt LambdaErrorQueue.Arn
     Export:
       Name: !Sub '${AWS::StackName}-LambdaErrorQueueArn'
+
+  MetricStreamName:
+    Condition: EnableNewRelic
+    Description: CloudWatch Metric Stream name for New Relic integration
+    Value: !Ref NewRelicMetricStream
+    Export:
+      Name: !Sub '${AWS::StackName}-MetricStreamName'
+
+  MetricStreamArn:
+    Condition: EnableNewRelic
+    Description: CloudWatch Metric Stream ARN
+    Value: !GetAtt NewRelicMetricStream.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-MetricStreamArn'
+
+  FirehoseDeliveryStreamName:
+    Condition: EnableNewRelic
+    Description: Kinesis Firehose delivery stream name
+    Value: !Ref MetricStreamFirehoseDeliveryStream
+    Export:
+      Name: !Sub '${AWS::StackName}-FirehoseDeliveryStreamName'
