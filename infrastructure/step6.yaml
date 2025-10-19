@@ -263,7 +263,6 @@ Resources:
     Type: AWS::IAM::Role
     Condition: EnableNewRelic
     Properties:
-      RoleName: !Sub 'MetricStreamFirehoseRole-${Environment}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -293,7 +292,6 @@ Resources:
     Type: AWS::IAM::Role
     Condition: EnableNewRelic
     Properties:
-      RoleName: !Sub 'MetricStreamRole-${Environment}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
