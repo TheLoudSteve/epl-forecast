@@ -18,6 +18,11 @@
 </head>
 <body>
     <div class="container">
+        <!-- Hamburger Menu - Fixed Top Left -->
+        <button id="hamburgerBtn" class="hamburger-btn" style="display: none;">
+            <span class="hamburger-icon">☰</span>
+        </button>
+
         <header>
             <h1>⚽ EPL Forecast</h1>
             <p class="subtitle">Predicted Final Premier League Table</p>
@@ -30,9 +35,6 @@
         </div>
 
         <div class="controls">
-            <button id="hamburgerBtn" class="hamburger-btn" style="display: none;">
-                <span class="hamburger-icon">☰</span>
-            </button>
             <div id="favoriteTeamSelector" class="favorite-team-selector">
                 <label for="favoriteTeam">Favorite Team:</label>
                 <select id="favoriteTeam" class="team-dropdown">
