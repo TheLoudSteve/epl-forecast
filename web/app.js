@@ -169,6 +169,9 @@ function renderTable(teams, metadata) {
         sortedTeams = [...teams].sort((a, b) => a.forecasted_position - b.forecasted_position);
     }
 
+    // Get forecast-sorted teams for contextual PPG calculations
+    const forecastSortedTeams = [...teams].sort((a, b) => a.forecasted_position - b.forecasted_position);
+
     sortedTeams.forEach((team) => {
         const row = document.createElement('tr');
 
@@ -181,10 +184,15 @@ function renderTable(teams, metadata) {
 
         const logoUrl = TEAM_LOGOS[team.name] || '';
 
-        // Determine which position and points to display
+        // Determine which position to display
         const displayPosition = currentView === 'live' ? team.current_position : team.forecasted_position;
-        const displayPoints = currentView === 'live' ? team.points : Math.round(team.forecasted_points);
-        const pointsLabel = currentView === 'live' ? 'pts' : 'proj';
+
+        // Forecast view: show PPG (2 decimals), Live view: show current points
+        const displayValue = currentView === 'live' ? team.points : formatDecimal(team.points_per_game, 2);
+        const valueLabel = currentView === 'live' ? 'pts' : 'PPG';
+
+        // Get contextual PPG target (1st, Top 4, or Safety based on position)
+        const contextualPPG = getContextualPPG(team, forecastSortedTeams);
 
         // Determine position-based color class
         let positionClass = 'position-mid-table';
@@ -202,15 +210,15 @@ function renderTable(teams, metadata) {
                         ${logoUrl ? `<img src="${logoUrl}" alt="${escapeHtml(team.name)}" class="team-logo" onerror="this.style.display='none'">` : ''}
                         <div class="team-details">
                             <span class="team-name">${escapeHtml(team.name)}</span>
-                            <span class="team-stats">${team.played} GP | ${team.points} PTS | ${formatDecimal(team.points_per_game)} PPG</span>
+                            <span class="team-stats">${team.played} GP | ${team.points} PTS | ${contextualPPG.label}: ${contextualPPG.value}</span>
                         </div>
                     </div>
                 </div>
             </td>
             <td class="col-forecast">
                 <div class="forecast-points">
-                    <span class="forecast-points-value ${isFavorite ? positionClass : ''}">${displayPoints}</span>
-                    <span class="forecast-points-label">${pointsLabel}</span>
+                    <span class="forecast-points-value ${isFavorite ? positionClass : ''}">${displayValue}</span>
+                    <span class="forecast-points-label">${valueLabel}</span>
                 </div>
             </td>
         `;
@@ -288,12 +296,74 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-function formatDecimal(value) {
+function formatDecimal(value, decimals = 1) {
     if (typeof value === 'number') {
-        return value.toFixed(1);
+        return value.toFixed(decimals);
     }
     // Handle Decimal string format from Python
-    return parseFloat(value).toFixed(1);
+    return parseFloat(value).toFixed(decimals);
+}
+
+// Calculate PPG needed in remaining games to reach a target
+function calculatePPGToTarget(team, targetPPG, totalGames = 38) {
+    // Calculate target's projected points
+    const targetProjected = Math.round(targetPPG * totalGames);
+
+    // Points needed to exceed target
+    const pointsNeeded = (targetProjected + 1) - team.points;
+
+    // Games remaining for this team
+    const gamesRemaining = totalGames - team.played;
+
+    // If no games remaining, can't improve
+    if (gamesRemaining <= 0) {
+        return 'Not Possible';
+    }
+
+    // Required PPG in remaining games
+    const requiredPPG = pointsNeeded / gamesRemaining;
+
+    // If required PPG > 3.0, show >3.00 (needs leader to drop points)
+    if (requiredPPG > 3.0) {
+        return '>3.00';
+    }
+
+    // If required PPG <= 0, they're already projected ahead
+    if (requiredPPG <= 0) {
+        return '0.00';
+    }
+
+    return requiredPPG.toFixed(2);
+}
+
+// Get contextual PPG target based on forecasted position
+function getContextualPPG(team, sortedTeams) {
+    const position = team.forecasted_position;
+
+    // 1st place - N/A
+    if (position === 1) {
+        return { value: 'N/A', label: 'PPG for 1st' };
+    }
+
+    // 2nd-4th - PPG for 1st (chasing title)
+    if (position >= 2 && position <= 4) {
+        const leaderPPG = parseFloat(sortedTeams[0]?.points_per_game) || 0;
+        return { value: calculatePPGToTarget(team, leaderPPG), label: 'PPG for 1st' };
+    }
+
+    // 5th-17th - PPG for Top 4 (chasing Champions League)
+    if (position >= 5 && position <= 17) {
+        const fourthPlacePPG = parseFloat(sortedTeams[3]?.points_per_game) || 0;
+        return { value: calculatePPGToTarget(team, fourthPlacePPG), label: 'PPG for Top 4' };
+    }
+
+    // 18th-20th - PPG for Safety (avoiding relegation)
+    if (position >= 18) {
+        const seventeenthPlacePPG = parseFloat(sortedTeams[16]?.points_per_game) || 0;
+        return { value: calculatePPGToTarget(team, seventeenthPlacePPG), label: 'PPG for Safety' };
+    }
+
+    return { value: 'N/A', label: '' };
 }
 
 // Auto-refresh every 5 minutes

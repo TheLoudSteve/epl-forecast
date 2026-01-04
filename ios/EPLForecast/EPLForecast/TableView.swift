@@ -16,6 +16,74 @@ struct TableView: View {
             return eplService.teams.sorted { $0.currentPosition < $1.currentPosition }
         }
     }
+
+    // Get forecast-sorted teams
+    var forecastSortedTeams: [Team] {
+        eplService.teams.sorted { $0.forecastedPosition < $1.forecastedPosition }
+    }
+
+    // Calculate PPG needed in remaining games to reach a target
+    func calculatePPGToTarget(for team: Team, targetPPG: Double, totalGames: Int = 38) -> String {
+        // Calculate target's projected points
+        let targetProjected = round(targetPPG * Double(totalGames))
+
+        // Points needed to exceed target
+        let pointsNeeded = (targetProjected + 1) - Double(team.points)
+
+        // Games remaining for this team
+        let gamesRemaining = totalGames - team.played
+
+        // If no games remaining, can't improve
+        if gamesRemaining <= 0 {
+            return "Not Possible"
+        }
+
+        // Required PPG in remaining games
+        let requiredPPG = pointsNeeded / Double(gamesRemaining)
+
+        // If required PPG > 3.0, show >3.00 (needs leader to drop points)
+        if requiredPPG > 3.0 {
+            return ">3.00"
+        }
+
+        // If required PPG <= 0, they're already projected ahead
+        if requiredPPG <= 0 {
+            return "0.00"
+        }
+
+        return String(format: "%.2f", requiredPPG)
+    }
+
+    // Get contextual PPG target based on forecasted position
+    func getContextualPPG(for team: Team) -> (value: String, label: String) {
+        let position = team.forecastedPosition
+        let sorted = forecastSortedTeams
+
+        // 1st place - N/A
+        if position == 1 {
+            return ("N/A", "PPG for 1st")
+        }
+
+        // 2nd-4th - PPG for 1st (chasing title)
+        if position >= 2 && position <= 4 {
+            let leaderPPG = sorted.first?.pointsPerGame ?? 0
+            return (calculatePPGToTarget(for: team, targetPPG: leaderPPG), "PPG for 1st")
+        }
+
+        // 5th-17th - PPG for Top 4 (chasing Champions League)
+        if position >= 5 && position <= 17 {
+            let fourthPlacePPG = sorted.count > 3 ? sorted[3].pointsPerGame : 0
+            return (calculatePPGToTarget(for: team, targetPPG: fourthPlacePPG), "PPG for Top 4")
+        }
+
+        // 18th-20th - PPG for Safety (avoiding relegation)
+        if position >= 18 {
+            let seventeenthPlacePPG = sorted.count > 16 ? sorted[16].pointsPerGame : 0
+            return (calculatePPGToTarget(for: team, targetPPG: seventeenthPlacePPG), "PPG for Safety")
+        }
+
+        return ("N/A", "")
+    }
     
     var body: some View {
         VStack {
@@ -109,7 +177,8 @@ struct TableView: View {
                                         team: team,
                                         isFavorite: team.name == userSettings.favoriteTeam,
                                         position: index + 1,
-                                        showForecast: showForecast
+                                        showForecast: showForecast,
+                                        contextualPPG: getContextualPPG(for: team)
                                     )
                                     .id("team-\(index)")
                                     
@@ -275,7 +344,8 @@ struct TeamRowView: View {
     let isFavorite: Bool
     let position: Int
     let showForecast: Bool
-    
+    let contextualPPG: (value: String, label: String)
+
     var body: some View {
         HStack {
             // Position indicator with Champions League and relegation colors
@@ -285,34 +355,34 @@ struct TeamRowView: View {
                     .fill(positionIndicatorColor)
                     .frame(width: 8, height: 8)
             }
-            
+
             Text("\(showForecast ? team.forecastedPosition : team.currentPosition)")
                 .font(.title3)
                 .fontWeight(.bold)
                 .foregroundColor(isFavorite ? team.primaryColor : positionTextColor)
                 .frame(width: 30, alignment: .leading)
                 .accessibilityLabel("Position \(showForecast ? team.forecastedPosition : team.currentPosition)")
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(team.name)
                     .font(.body)
                     .fontWeight(isFavorite ? .semibold : .medium)
                     .foregroundColor(isFavorite ? team.primaryColor : .primary)
-                
-                Text("\(team.played) GP | \(team.points) PTS | \(String(format: "%.1f", team.pointsPerGame)) PPG")
+
+                Text("\(team.played) GP | \(team.points) PTS | \(contextualPPG.label): \(contextualPPG.value)")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            
+
             Spacer()
-            
+
             VStack(alignment: .trailing, spacing: 2) {
-                Text("\(showForecast ? String(format: "%.0f", team.forecastedPoints) : String(team.points))")
+                Text("\(showForecast ? String(format: "%.2f", team.pointsPerGame) : String(team.points))")
                     .font(.title3)
                     .fontWeight(.bold)
                     .foregroundColor(isFavorite ? team.primaryColor : .primary)
-                
-                Text(showForecast ? "proj" : "pts")
+
+                Text(showForecast ? "PPG" : "pts")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
@@ -324,7 +394,7 @@ struct TeamRowView: View {
                 .fill(isFavorite ? team.backgroundColor : Color.clear)
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(team.name)\(isFavorite ? " (your team)" : ""), position \(showForecast ? team.forecastedPosition : team.currentPosition), \(showForecast ? "forecasted \(String(format: "%.0f", team.forecastedPoints)) points" : "\(team.points) current points"), played \(team.played) games, \(String(format: "%.1f", team.pointsPerGame)) points per game")
+        .accessibilityLabel("\(team.name)\(isFavorite ? " (your team)" : ""), position \(showForecast ? team.forecastedPosition : team.currentPosition), \(showForecast ? "\(String(format: "%.2f", team.pointsPerGame)) points per game" : "\(team.points) current points"), played \(team.played) games, \(contextualPPG.label): \(contextualPPG.value)")
     }
     
     // Computed properties for position-based styling
