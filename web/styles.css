@@ -338,6 +338,56 @@ h1 {
     color: var(--text-primary); /* Default for mid-table (5-17) */
 }
 
+/* Zone divider rows */
+.zone-divider {
+    background-color: transparent !important;
+}
+
+.zone-divider:hover {
+    background-color: transparent !important;
+}
+
+.zone-divider td {
+    padding: 12px 0 !important;
+    border-bottom: none !important;
+}
+
+.zone-divider-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.zone-divider-line {
+    width: 100%;
+    height: 3px;
+}
+
+.zone-divider-line.champions-league {
+    background-color: #007AFF;
+}
+
+.zone-divider-line.relegation {
+    background-color: #FF3B30;
+}
+
+.zone-divider-text {
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    text-align: center;
+    line-height: 1.3;
+}
+
+.zone-divider-text.champions-league {
+    color: #007AFF;
+}
+
+.zone-divider-text.relegation {
+    color: #FF3B30;
+}
+
 .change-indicator {
     font-size: 1.2rem;
     font-weight: bold;

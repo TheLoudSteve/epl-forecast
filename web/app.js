@@ -224,6 +224,33 @@ function renderTable(teams, metadata) {
         `;
 
         tableBody.appendChild(row);
+
+        // Add zone dividers after 4th place (Champions League) and after 17th place (Relegation)
+        if (displayPosition === 4) {
+            const dividerRow = document.createElement('tr');
+            dividerRow.className = 'zone-divider';
+            dividerRow.innerHTML = `
+                <td colspan="2">
+                    <div class="zone-divider-content">
+                        <div class="zone-divider-line champions-league"></div>
+                        <span class="zone-divider-text champions-league">Champions<br>League</span>
+                    </div>
+                </td>
+            `;
+            tableBody.appendChild(dividerRow);
+        } else if (displayPosition === 17) {
+            const dividerRow = document.createElement('tr');
+            dividerRow.className = 'zone-divider';
+            dividerRow.innerHTML = `
+                <td colspan="2">
+                    <div class="zone-divider-content">
+                        <div class="zone-divider-line relegation"></div>
+                        <span class="zone-divider-text relegation">Relegation<br>Zone</span>
+                    </div>
+                </td>
+            `;
+            tableBody.appendChild(dividerRow);
+        }
     });
 
     tableContainer.style.display = 'block';
