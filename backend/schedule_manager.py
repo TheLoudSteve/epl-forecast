@@ -40,6 +40,17 @@ dynamodb = boto3.resource('dynamodb', region_name=region)
 s3 = boto3.client('s3', region_name=region)
 events = boto3.client('events', region_name=region)
 
+
+def is_match_event_summary(summary: Any) -> bool:
+    """Return whether an ICS event summary represents a football fixture.
+
+    The calendar provider may prefix fixture titles with editorial badges (for
+    example, ``🟣⚽️`` or ``📰⚽️``). The football marker is therefore not
+    guaranteed to be the first character.
+    """
+    summary_text = str(summary)
+    return '⚽' in summary_text and ' v ' in summary_text
+
 # @newrelic.agent.lambda_handler if NEW_RELIC_ENABLED else lambda x: x
 def lambda_handler(event, context):
     """
@@ -179,9 +190,10 @@ def parse_ics_schedule(s3_bucket: str) -> List[Dict[str, Any]]:
                     if window_start <= start_time <= window_end:
                         match_summary = component.get('summary', 'Unknown Match')
 
-                        # Filter out non-match events (awards, announcements, etc.)
-                        # Real matches start with ⚽️ emoji
-                        if not str(match_summary).startswith('⚽️'):
+                        # Filter out non-match events (awards, announcements, etc.).
+                        # Fixture titles can have provider-added badges before the
+                        # football emoji, so do not require the emoji to be first.
+                        if not is_match_event_summary(match_summary):
                             print(f"Skipping non-match event: {match_summary}")
                             continue
 
